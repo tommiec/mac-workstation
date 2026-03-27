@@ -1,0 +1,10 @@
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# runtime (nooit committen)
+~/Library/Application Support/mac-maintenance/
+~/Library/Logs/mac_maintenance/
+EOF
