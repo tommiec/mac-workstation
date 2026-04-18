@@ -7,53 +7,24 @@
 # andere scripts.
 #
 # Workflow:
-#   1. Bewaar alle scripts in iCloud Drive
+#   1. Bewaar de bootstrap installer in iCloud Drive
 #   2. Voer mac_install.sh éénmalig uit op een nieuwe Mac
-#   3. Scripts worden gekopieerd naar:
-#        ~/Library/Application Support/mac-maintenance/
-#   4. launchd draait mac_auto.sh automatisch elke zaterdag
+#   3. De scripts worden geplaatst in:
+#        ~/Repositories/mac-maintenance/scripts/
+#   4. Er komt een symlink:
+#        ~/Scripts/mac-maintenance -> ~/Repositories/mac-maintenance
+#   5. launchd draait mac_auto.sh automatisch elke zaterdag
 #        om 02:00
-#   5. Manueel onderhoud: bash .../mac_manual.sh
-#   6. Scripts bijwerken: aanpassen in iCloud, daarna
-#        mac_install.sh opnieuw uitvoeren
+#   6. Manueel onderhoud kan via:
+#        mm manual
+#        of bash ~/Scripts/mac-maintenance/scripts/mac_manual.sh
 # =========================================================
 
-# ── Logging ─────────────────────────────────────────────
+# ── Config ──────────────────────────────────────────────
+# SCRIPTS_DIR wijst naar de scripts-map binnen de repo.
+# Alle andere scripts sourcen dit bestand en erven SCRIPTS_DIR.
 
-STEP_OK=0
-STEP_WARN=0
-SUMMARY=()
-
-log_ok()   { echo "   ✅ $*"; SUMMARY+=("✅ $*"); ((STEP_OK++)) || true; }
-log_warn() { echo "   ⚠️  $*"; SUMMARY+=("⚠️  $*"); ((STEP_WARN++)) || true; }
-log_info() { echo "   ℹ️  $*"; }
-
-run_step() {
-    local msg="$1"; shift
-    if "$@"; then
-        log_ok "$msg"
-    else
-        log_warn "$msg mislukt"
-    fi
-}
-
-summary_print() {
-    echo ""
-    echo "── 📊 Samenvatting ───────────────────────────────"
-    printf '%s\n' "${SUMMARY[@]}"
-    echo ""
-    echo "   Resultaat: $STEP_OK OK / $STEP_WARN waarschuwingen"
-}
-
-notify_user() {
-    local title="$1"
-    local message="$2"
-    /usr/bin/osascript -e "display notification \"${message//\"/\\\"}\" with title \"${title//\"/\\\"}\""
-}
-
-# ── Config ─────────────────────────────────────────────
-
-BASE_DIR="$HOME/Library/Application Support/mac-maintenance"
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="$HOME/Library/Logs/mac_maintenance"
 
 LAUNCH_AGENT_LABEL="local.mac.auto-maintenance"
@@ -83,17 +54,70 @@ CLI_TOOLS=(
   nmap
 )
 
-# ── Homebrew ───────────────────────────────────────────
+# ── Logging ─────────────────────────────────────────────
+
+STEP_OK=0
+STEP_WARN=0
+SUMMARY=()
+
+log_ok() {
+    echo "   ✅ $*"
+    SUMMARY+=("✅ $*")
+    (( STEP_OK++ )) || true
+}
+
+log_warn() {
+    echo "   ⚠️  $*"
+    SUMMARY+=("⚠️  $*")
+    (( STEP_WARN++ )) || true
+}
+
+log_info() {
+    echo "   ℹ️  $*"
+}
+
+# Voert een commando uit en logt het resultaat op basis van exit code.
+# Gebruik: run_step "beschrijving" commando [args...]
+run_step() {
+    local msg="$1"; shift
+    if "$@"; then
+        log_ok "$msg"
+    else
+        log_warn "$msg mislukt"
+    fi
+}
+
+summary_print() {
+    echo ""
+    echo "── 📊 Samenvatting ───────────────────────────────"
+    if [[ "${#SUMMARY[@]}" -eq 0 ]]; then
+        echo "   (geen stappen geregistreerd)"
+    else
+        printf '%s\n' "${SUMMARY[@]}"
+    fi
+    echo ""
+    echo "   Resultaat: $STEP_OK OK / $STEP_WARN waarschuwingen"
+}
+
+notify_user() {
+    local title="$1"
+    local message="$2"
+    /usr/bin/osascript \
+        -e "display notification \"${message//\"/\\\"}\" with title \"${title//\"/\\\"}\""
+}
+
+# ── Homebrew ────────────────────────────────────────────
 
 ensure_brew() {
     if ! command -v brew &>/dev/null; then
         echo "Homebrew installeren..."
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || return 1
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
+            || return 1
     fi
     return 0
 }
 
-# ── LaunchAgent ────────────────────────────────────────
+# ── LaunchAgent ─────────────────────────────────────────
 
 write_auto_launch_agent() {
     mkdir -p "$(dirname "$LAUNCH_AGENT_PATH")"
@@ -109,7 +133,7 @@ write_auto_launch_agent() {
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>$BASE_DIR/mac_auto.sh</string>
+        <string>$SCRIPTS_DIR/mac_auto.sh</string>
     </array>
 
     <key>StartCalendarInterval</key>
