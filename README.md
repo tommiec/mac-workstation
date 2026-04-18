@@ -12,57 +12,62 @@ One-time setup. Runs automatically. Manual control when needed.
 
 | Script | Purpose |
 |---|---|
-| `mac_install.sh` | One-time setup on a new Mac |
+| `mac_install.sh` | Bootstrap setup (repo, symlink, CLI, launchd) |
 | `mac_auto.sh` | Automated weekly maintenance (launchd) |
 | `mac_manual.sh` | Manual diagnostics and updates |
+| `mac_doctor.sh` | Health checks and diagnostics (`mm doctor`) |
 | `mac_common.sh` | Shared configuration and helpers |
 
 ## How it works
 
-Scripts are stored in **iCloud Drive** (source) and deployed to **Application Support** (runtime) by `mac_install.sh`. launchd always runs the local copy — never the iCloud version.
+Scripts are managed using a **repo + symlink + CLI model**:
 
 ```
-iCloud Drive/Scripts/mac-maintenance/   → edit here
-~/Library/Application Support/mac-maintenance/  → runs here
-~/Library/Logs/mac_maintenance/         → logs here
+~/Repositories/mac-maintenance          → source of truth (git repo)
+~/Scripts/mac-maintenance               → symlink to repo
+~/Scripts/bin/mm                        → CLI entrypoint
+~/Library/Logs/mac_maintenance/         → logs
 ```
+
+- The repo contains all scripts and is version-controlled
+- A symlink provides a stable runtime path
+- The `mm` command provides a simple interface
+- launchd runs the auto-maintenance script from the symlinked location
 
 ## Installation
 
-Clone into iCloud Drive, then run once on a new Mac:
+Clone the repository and run the installer once:
 
 ```bash
-mkdir -p ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts
-cd ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts
-git clone https://github.com/tommiec/mac-maintenance.git
+git clone https://github.com/tommiec/mac-maintenance.git ~/Repositories/mac-maintenance
+bash ~/Repositories/mac-maintenance/scripts/mac_install.sh
 ```
 
-```bash
-bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-maintenance/scripts/mac_install.sh
-```
-
-This installs Homebrew packages, copies scripts to Application Support, and registers the weekly launchd agent.
+The installer will:
+- set up Homebrew (if needed)
+- install required packages
+- create the symlink under `~/Scripts/mac-maintenance`
+- install the `mm` command in `~/Scripts/bin`
+- register the weekly launchd job
 
 ## Usage
 
-**Automatic** — runs every Saturday at 02:00 via launchd, no action needed.
+**Automatic** — runs every Saturday at 02:00 via launchd.
 
-**Manual:**
-```bash
-bash ~/Library/Application\ Support/mac-maintenance/mac_manual.sh
-```
+**Manual commands:**
 
-**Update:**
 ```bash
-cd ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-maintenance
-git pull
-bash scripts/mac_install.sh
+mm auto     # run automated maintenance now
+mm manual   # run manual diagnostics and updates
+mm install  # re-run setup
+mm doctor   # check system health
 ```
 
 ## Notes
 
-- Runs as LaunchAgent (user context, no root daemon)
-- Safe to re-run `mac_install.sh` at any time
+- Uses a LaunchAgent (user context, no root daemon)
+- Safe to re-run `mm install` at any time
+- `mm doctor` can be used to validate the setup
 
 ## License
 
