@@ -3,8 +3,11 @@
 # mac_install.sh
 # Bootstrap setup script — installeert apps en configureert automation
 #
-# Gebruik (éénmalig op nieuwe Mac, bv. vanuit iCloud Drive):
-#   bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac/mac_install.sh
+# Gebruik (éénmalig op nieuwe Mac):
+#   GitHub:
+#     bash ~/Repositories/mac-maintenance/scripts/mac_install.sh
+#   iCloud Drive:
+#     bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-maintenance/scripts/mac_install.sh
 #
 # Wat dit script doet:
 #   1. Kopieert de maintenance-repo naar:
@@ -161,6 +164,9 @@ if load_auto_launch_agent; then
 else
     log_warn "LaunchAgent laden mislukt"
 fi
+
+# ── iCloud bootstrap copy ───────────
+sync_scripts_to_icloud
 
 # ── Samenvatting ─────────────────────
 

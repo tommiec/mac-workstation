@@ -1,23 +1,24 @@
 #!/bin/bash
 # =========================================================
 # mac_common.sh
-# Gedeelde functies, config en helpers
+# Shared configuration, paths and helper functions
 #
-# Niet rechtstreeks uitvoeren — wordt gesourced door de
-# andere scripts.
+# Do not run directly — sourced by the other scripts.
 #
-# Workflow:
-#   1. Bewaar de bootstrap installer in iCloud Drive
-#   2. Voer mac_install.sh éénmalig uit op een nieuwe Mac
-#   3. De scripts worden geplaatst in:
-#        ~/Repositories/mac-maintenance/scripts/
-#   4. Er komt een symlink:
-#        ~/Scripts/mac-maintenance -> ~/Repositories/mac-maintenance
-#   5. launchd draait mac_auto.sh automatisch elke zaterdag
-#        om 02:00
-#   6. Manueel onderhoud kan via:
-#        mm manual
-#        of bash ~/Scripts/mac-maintenance/scripts/mac_manual.sh
+# Supported bootstrap models:
+#
+# 1. GitHub / repo (recommended)
+#    - Source of truth: ~/Repositories/mac-maintenance
+#    - Runtime path:     ~/Scripts/mac-maintenance -> repo symlink
+#    - CLI entrypoint:   ~/Scripts/bin/mm
+#
+# 2. iCloud Drive (bootstrap / fallback)
+#    - Optional synced copy under:
+#        ~/Library/Mobile Documents/com~apple~CloudDocs/Scripts/mac-maintenance/
+#    - Useful on a new Mac before Git is configured
+#    - Can be refreshed from the repo when needed
+#
+# In normal use, GitHub/repo remains the canonical source.
 # =========================================================
 
 # ── Config ──────────────────────────────────────────────
@@ -26,6 +27,14 @@
 
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="$HOME/Library/Logs/mac_maintenance"
+REPO_ROOT="$HOME/Repositories/mac-maintenance"
+SCRIPTS_ROOT="$HOME/Scripts"
+SYMLINK_PATH="$SCRIPTS_ROOT/mac-maintenance"
+BIN_DIR="$SCRIPTS_ROOT/bin"
+MM_PATH="$BIN_DIR/mm"
+ICLOUD_SCRIPTS_ROOT="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Scripts"
+ICLOUD_BOOTSTRAP_ROOT="$ICLOUD_SCRIPTS_ROOT/mac-maintenance"
+ICLOUD_BOOTSTRAP_DIR="$ICLOUD_BOOTSTRAP_ROOT/scripts"
 
 LAUNCH_AGENT_LABEL="local.mac.auto-maintenance"
 LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LAUNCH_AGENT_LABEL}.plist"
@@ -162,6 +171,22 @@ load_auto_launch_agent() {
     if /bin/launchctl print "gui/$(id -u)/$LAUNCH_AGENT_LABEL" >/dev/null 2>&1; then
         return 0
     else
+        return 1
+    fi
+}
+
+sync_scripts_to_icloud() {
+    if [[ ! -d "$ICLOUD_SCRIPTS_ROOT" ]]; then
+        log_warn "iCloud Scripts-map niet gevonden, sync overgeslagen"
+        return 0
+    fi
+
+    mkdir -p "$ICLOUD_BOOTSTRAP_DIR"
+
+    if rsync -av --delete "$SCRIPTS_DIR/" "$ICLOUD_BOOTSTRAP_DIR/" >/dev/null 2>&1; then
+        log_ok "iCloud bootstrap copy bijgewerkt"
+    else
+        log_warn "iCloud bootstrap copy bijwerken mislukt"
         return 1
     fi
 }

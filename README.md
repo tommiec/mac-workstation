@@ -50,6 +50,41 @@ The installer will:
 - install the `mm` command in `~/Scripts/bin`
 - register the weekly launchd job
 
+## Bootstrap options
+
+The **GitHub repository is the source of truth** for this project. All changes should be committed there.
+
+There are two supported ways to bootstrap a new Mac:
+
+### Option 1 — GitHub (recommended)
+
+```bash
+git clone https://github.com/tommiec/mac-maintenance.git ~/Repositories/mac-maintenance
+bash ~/Repositories/mac-maintenance/scripts/mac_install.sh
+```
+
+- Always up to date
+- Preferred for first setup or clean installs
+
+### Option 2 — iCloud Drive (convenience)
+
+If you already have a synced copy in iCloud Drive, you can run the installer from there:
+
+```bash
+bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-maintenance/scripts/mac_install.sh
+```
+
+- Useful when Git is not yet configured
+- Acts as a bootstrap/fallback mechanism
+
+⚠️ The installer copies scripts from the location it is executed from into `~/Repositories/mac-maintenance`.
+
+→ The installer copies scripts from the directory you run `mac_install.sh` from into `~/Repositories/mac-maintenance`. If you run it from iCloud, that copy is used; if you run it from the repo, the repo is used.
+
+To avoid drift:
+- treat GitHub as the canonical source
+- keep any iCloud copy in sync (or regenerate it from the repo)
+
 ## Usage
 
 **Automatic** — runs every Saturday at 02:00 via launchd.
