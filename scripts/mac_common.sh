@@ -58,6 +58,7 @@ MANAGED_CASKS=(
   onyx
   appcleaner
   monitorcontrol
+  virtualbox
 )
 
 CLI_TOOLS=(
