@@ -57,6 +57,7 @@ MANAGED_CASKS=(
   vlc
   onyx
   appcleaner
+  monitorcontrol
 )
 
 CLI_TOOLS=(
