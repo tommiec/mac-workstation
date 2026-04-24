@@ -53,7 +53,7 @@ echo "── 🚀 Installatie gestart ──"
 # altijd de meest recente versie vanuit de repo uitvoert.
 
 COPY_OK=true
-for f in mac_common.sh mac_auto.sh mac_manual.sh mac_install.sh mac_doctor.sh; do
+for f in mac_common.sh mac_auto.sh mac_manual.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
     SRC="$SRC_DIR/$f"
     DST="$TARGET_DIR/$f"
 
@@ -100,12 +100,17 @@ case "$1" in
     shift
     "$HOME/Scripts/mac-maintenance/scripts/mac_doctor.sh" "$@"
     ;;
+  triage)
+    shift
+    "$HOME/Scripts/mac-maintenance/scripts/mac_triage.sh" "$@"
+    ;;
   help|"")
     echo "Gebruik:"
     echo "  mm auto     # automatische maintenance"
     echo "  mm manual   # manueel onderhoud"
     echo "  mm install  # setup uitvoeren"
     echo "  mm doctor   # setup controleren"
+    echo "  mm triage   # snelle file/malware triage"
     ;;
   *)
     echo "Onbekend commando: $1"
