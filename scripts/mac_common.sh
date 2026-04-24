@@ -65,6 +65,7 @@ MANAGED_CASKS=(
 CLI_TOOLS=(
   nmap
   virustotal-cli
+  dos2unix
 )
 
 # ── Logging ─────────────────────────────────────────────
