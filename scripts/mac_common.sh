@@ -59,10 +59,12 @@ MANAGED_CASKS=(
   appcleaner
   monitorcontrol
   virtualbox
+  marsanne/cask/virustotal
 )
 
 CLI_TOOLS=(
   nmap
+  virustotal-cli
 )
 
 # ── Logging ─────────────────────────────────────────────
