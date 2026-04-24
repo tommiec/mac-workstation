@@ -16,6 +16,7 @@ One-time setup. Runs automatically. Manual control when needed.
 | `mac_auto.sh` | Automated weekly maintenance (launchd) |
 | `mac_manual.sh` | Manual diagnostics and updates |
 | `mac_doctor.sh` | Health checks and diagnostics (`mm doctor`) |
+| `mac_triage.sh` | Quick file/malware triage with hash, VirusTotal and strings (`mm triage`) |
 | `mac_common.sh` | Shared configuration and helpers |
 
 ## How it works
@@ -96,7 +97,24 @@ mm auto     # run automated maintenance now
 mm manual   # run manual diagnostics and updates
 mm install  # re-run setup
 mm doctor   # check system health
+mm triage <file>  # inspect a suspicious file
 ```
+
+## File triage
+
+Use `mm triage` for a quick first look at a suspicious file:
+
+```bash
+mm triage ~/Downloads/example.exe
+```
+
+The command:
+- identifies the file type using `file`
+- calculates the SHA256 hash
+- looks up the hash in VirusTotal when the `vt` CLI is available
+- opens extracted strings in `less`
+
+The installer installs both the VirusTotal GUI app and `virustotal-cli`. The triage script uses the CLI command `vt` for lookups, so configure the `vt` CLI with your VirusTotal API key first. The string view opens in `less`; press `q` to exit it.
 
 ## Notes
 
