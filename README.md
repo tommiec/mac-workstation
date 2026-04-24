@@ -78,9 +78,7 @@ bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-maintenance/scr
 - Useful when Git is not yet configured
 - Acts as a bootstrap/fallback mechanism
 
-⚠️ The installer copies scripts from the location it is executed from into `~/Repositories/mac-maintenance`.
-
-→ The installer copies scripts from the directory you run `mac_install.sh` from into `~/Repositories/mac-maintenance`. If you run it from iCloud, that copy is used; if you run it from the repo, the repo is used.
+⚠️ The installer copies scripts from the directory you run `mac_install.sh` from into `~/Repositories/mac-maintenance`. If you run it from iCloud, that copy is used; if you run it from the repo, the repo is used. This keeps bootstrap flexible for different setup scenarios.
 
 To avoid drift:
 - treat GitHub as the canonical source
@@ -98,6 +96,7 @@ mm manual   # run manual diagnostics and updates
 mm install  # re-run setup
 mm doctor   # check system health
 mm triage <file>  # inspect a suspicious file
+mm help     # show available commands
 ```
 
 ## File triage
@@ -112,7 +111,12 @@ The command:
 - identifies the file type using `file`
 - calculates the SHA256 hash
 - looks up the hash in VirusTotal when the `vt` CLI is available
-- opens extracted strings in `less`
+- shows a short hex preview
+- checks magic bytes against common file types
+- flags mismatches between file extension and detected content
+- extracts quick indicators such as URLs, IPs, shell commands and suspicious strings
+- prints a simple triage score
+- opens extracted strings in `less` for manual review
 
 The installer installs both the VirusTotal GUI app and `virustotal-cli`. The triage script uses the CLI command `vt` for lookups, so configure the `vt` CLI with your VirusTotal API key first. The string view opens in `less`; press `q` to exit it.
 
