@@ -1,16 +1,16 @@
 #!/bin/bash
 # =========================================================
 # mac_auto.sh
-# Wekelijkse automatische maintenance (launchd)
+# Weekly automated maintenance (launchd)
 #
-# Niet rechtstreeks uitvoeren — draait automatisch via
-# launchd (geregistreerd door mac_install.sh).
-# Schema: elke zaterdag om 02:00
+# Do not run directly — runs automatically through
+# launchd (registered by mac_install.sh).
+# Schedule: every Saturday at 02:00
 #
-# Wat dit script doet:
-#   - Homebrew formulas updaten en opruimen
-#   - macOS updates detecteren en melden via notificatie
-#   - Oude cachebestanden (>7 dagen) verwijderen
+# What this script does:
+#   - Updates and cleans up Homebrew formulas
+#   - Detects macOS updates and reports them through a notification
+#   - Deletes old cache files (>7 days)
 # =========================================================
 
 set -o pipefail
@@ -22,13 +22,13 @@ source "$SCRIPT_DIR/mac_common.sh"
 mkdir -p "$LOG_DIR"
 exec > >(tee -a "$LOG_DIR/auto_$(date '+%Y-%m-%d_%H-%M-%S').log") 2>&1
 
-notify_user "Mac onderhoud gestart" "Automatische maintenance gestart."
+notify_user "Mac maintenance started" "Automated maintenance started."
 
-echo "── ⚡ Auto onderhoud ──"
+echo "── ⚡ Auto maintenance ──"
 
 # ── Brew ─────────────────────────────
-# brew wordt gecontroleerd via command -v, niet via ensure_brew:
-# in een nachtjob willen we geen interactieve Homebrew-installatie starten.
+# brew is checked through command -v, not ensure_brew:
+# in a scheduled night job, we do not want to start an interactive Homebrew install.
 
 if command -v brew &>/dev/null; then
     run_step "brew update"     brew update
@@ -36,31 +36,31 @@ if command -v brew &>/dev/null; then
     run_step "brew cleanup"    brew cleanup --prune=30
     run_step "brew autoremove" brew autoremove
 else
-    log_warn "brew niet beschikbaar — sla brew-stappen over"
+    log_warn "brew unavailable — skipping brew steps"
 fi
 
 # ── macOS updates ────────────────────
-# Enkel detecteren en melden; installatie gebeurt via 'mm manual'.
-# softwareupdate --list schrijft naar stderr; 2>&1 vangt dit op.
-# grep -c geeft exit 1 bij 0 matches; || echo 0 vangt dit op.
+# Detect and report only; installation happens through 'mm manual'.
+# softwareupdate --list writes to stderr; 2>&1 captures it.
+# grep -c exits with 1 for 0 matches; || true handles that.
 
 UPDATES="$(/usr/sbin/softwareupdate --list 2>&1 || true)"
 COUNT=$(echo "$UPDATES" | grep -cE '^[[:space:]]*\*' || true)
 COUNT=${COUNT:-0}
 
 if [[ "$COUNT" -eq 0 ]]; then
-    log_ok "Geen macOS updates beschikbaar"
+    log_ok "No macOS updates available"
 else
-    log_warn "$COUNT macOS update(s) beschikbaar"
-    notify_user "macOS updates beschikbaar" "Gebruik 'mm manual' om te installeren."
+    log_warn "$COUNT macOS update(s) available"
+    notify_user "macOS updates available" "Use 'mm manual' to install them."
 fi
 
 # ── Cache cleanup ────────────────────
-# Verwijdert bestanden ouder dan 7 dagen uit ~/Library/Caches.
-# Systeemmappen die door launchd-diensten actief gebruikt worden
-# (bv. com.apple.bird voor iCloud) worden bewust niet uitgesloten:
-# bestanden ouder dan 7 dagen zijn daar zelden in gebruik om 02:00.
-# Pas de -mtime drempel aan indien je hier problemen mee ervaart.
+# Deletes files older than 7 days from ~/Library/Caches.
+# System folders actively used by launchd services
+# (for example com.apple.bird for iCloud) are intentionally not excluded:
+# files older than 7 days are rarely in use there at 02:00.
+# Adjust the -mtime threshold if this causes issues.
 
 DELETED=$(
     /usr/bin/find "$HOME/Library/Caches" \
@@ -69,8 +69,8 @@ DELETED=$(
     | /usr/bin/wc -l \
     | /usr/bin/tr -d ' '
 )
-log_ok "$DELETED oude cachebestanden verwijderd"
+log_ok "$DELETED old cache file(s) deleted"
 
-notify_user "Mac onderhoud voltooid" "Maintenance afgerond."
+notify_user "Mac maintenance completed" "Maintenance finished."
 
 summary_print

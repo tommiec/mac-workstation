@@ -22,8 +22,8 @@
 # =========================================================
 
 # ── Config ──────────────────────────────────────────────
-# SCRIPTS_DIR wijst naar de scripts-map binnen de repo.
-# Alle andere scripts sourcen dit bestand en erven SCRIPTS_DIR.
+# SCRIPTS_DIR points to the scripts directory inside the repo.
+# All other scripts source this file and inherit SCRIPTS_DIR.
 
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="$HOME/Library/Logs/mac_maintenance"
@@ -39,7 +39,7 @@ ICLOUD_BOOTSTRAP_DIR="$ICLOUD_BOOTSTRAP_ROOT/scripts"
 LAUNCH_AGENT_LABEL="local.mac.auto-maintenance"
 LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LAUNCH_AGENT_LABEL}.plist"
 
-# launchd: 0=zondag ... 6=zaterdag
+# launchd: 0=Sunday ... 6=Saturday
 AUTO_WEEKDAY=6
 AUTO_HOUR=2
 AUTO_MINUTE=0
@@ -90,27 +90,27 @@ log_info() {
     echo "   ℹ️  $*"
 }
 
-# Voert een commando uit en logt het resultaat op basis van exit code.
-# Gebruik: run_step "beschrijving" commando [args...]
+# Runs a command and logs the result based on its exit code.
+# Usage: run_step "description" command [args...]
 run_step() {
     local msg="$1"; shift
     if "$@"; then
         log_ok "$msg"
     else
-        log_warn "$msg mislukt"
+        log_warn "$msg failed"
     fi
 }
 
 summary_print() {
     echo ""
-    echo "── 📊 Samenvatting ───────────────────────────────"
+    echo "── 📊 Summary ───────────────────────────────────"
     if [[ "${#SUMMARY[@]}" -eq 0 ]]; then
-        echo "   (geen stappen geregistreerd)"
+        echo "   (no steps recorded)"
     else
         printf '%s\n' "${SUMMARY[@]}"
     fi
     echo ""
-    echo "   Resultaat: $STEP_OK OK / $STEP_WARN waarschuwingen"
+    echo "   Result: $STEP_OK OK / $STEP_WARN warning(s)"
 }
 
 notify_user() {
@@ -124,7 +124,7 @@ notify_user() {
 
 ensure_brew() {
     if ! command -v brew &>/dev/null; then
-        echo "Homebrew installeren..."
+        echo "Installing Homebrew..."
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
             || return 1
     fi
@@ -182,16 +182,16 @@ load_auto_launch_agent() {
 
 sync_scripts_to_icloud() {
     if [[ ! -d "$ICLOUD_SCRIPTS_ROOT" ]]; then
-        log_warn "iCloud Scripts-map niet gevonden, sync overgeslagen"
+        log_warn "iCloud Scripts folder not found, skipping sync"
         return 0
     fi
 
     mkdir -p "$ICLOUD_BOOTSTRAP_DIR"
 
     if rsync -av --delete "$SCRIPTS_DIR/" "$ICLOUD_BOOTSTRAP_DIR/" >/dev/null 2>&1; then
-        log_ok "iCloud bootstrap copy bijgewerkt"
+        log_ok "iCloud bootstrap copy updated"
     else
-        log_warn "iCloud bootstrap copy bijwerken mislukt"
+        log_warn "Failed to update iCloud bootstrap copy"
         return 1
     fi
 }

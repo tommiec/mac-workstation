@@ -1,27 +1,27 @@
 #!/bin/bash
 # =========================================================
 # mac_install.sh
-# Bootstrap setup script — installeert apps en configureert automation
+# Bootstrap setup script — installs apps and configures automation
 #
-# Gebruik (éénmalig op nieuwe Mac):
+# Usage (once on a new Mac):
 #   GitHub:
 #     bash ~/Repositories/mac-maintenance/scripts/mac_install.sh
 #   iCloud Drive:
 #     bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-maintenance/scripts/mac_install.sh
 #
-# Wat dit script doet:
-#   1. Kopieert de maintenance-repo naar:
+# What this script does:
+#   1. Copies the maintenance repo to:
 #        ~/Repositories/mac-maintenance
-#   2. Maakt een symlink:
+#   2. Creates a symlink:
 #        ~/Scripts/mac-maintenance -> ~/Repositories/mac-maintenance
-#   3. Maakt een command wrapper:
+#   3. Creates a command wrapper:
 #        ~/Scripts/bin/mm
-#   4. Installeert Homebrew indien nodig
-#   5. Installeert alle apps uit MANAGED_CASKS en CLI_TOOLS
-#   6. Registreert mac_auto.sh als wekelijkse launchd-agent
-#        (elke zaterdag om 02:00)
+#   4. Installs Homebrew if needed
+#   5. Installs all apps from MANAGED_CASKS and CLI_TOOLS
+#   6. Registers mac_auto.sh as a weekly launchd agent
+#        (every Saturday at 02:00)
 #
-# Na installatie:
+# After installation:
 #   mm auto
 #   mm manual
 #   mm install
@@ -31,7 +31,7 @@
 set -o pipefail
 set -u
 
-# SRC_DIR = locatie van dit script (bv. iCloud Drive bij eerste run)
+# SRC_DIR = location of this script (for example iCloud Drive on first run)
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 REPO_ROOT="$HOME/Repositories/mac-maintenance"
@@ -45,12 +45,12 @@ mkdir -p "$REPO_ROOT"
 mkdir -p "$TARGET_DIR"
 mkdir -p "$BIN_DIR"
 
-echo "── 🚀 Installatie gestart ──"
+echo "── 🚀 Installation started ──"
 
-# ── Scripts naar repo kopiëren ───────────────────────────
-# Elke kopie wordt apart gelogd zodat fouten zichtbaar zijn.
-# mac_install.sh kopieert zichzelf bewust mee, zodat 'mm install'
-# altijd de meest recente versie vanuit de repo uitvoert.
+# ── Copy scripts to repo ─────────────────────────────────
+# Each copy is logged separately so errors are visible.
+# mac_install.sh intentionally copies itself, so 'mm install'
+# always runs the latest version from the repo.
 
 COPY_OK=true
 for f in mac_common.sh mac_auto.sh mac_manual.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
@@ -58,27 +58,27 @@ for f in mac_common.sh mac_auto.sh mac_manual.sh mac_install.sh mac_doctor.sh ma
     DST="$TARGET_DIR/$f"
 
     if cmp -s "$SRC" "$DST" 2>/dev/null; then
-        echo "   ✔️ $f identiek (skip)"
+        echo "   ✔️ $f identical (skipped)"
     elif cp "$SRC" "$DST"; then
-        echo "   ✅ $f gekopieerd"
+        echo "   ✅ $f copied"
     else
-        echo "   ❌ $f kopiëren mislukt"
+        echo "   ❌ failed to copy $f"
         COPY_OK=false
     fi
 done
 
 if [[ "$COPY_OK" == false ]]; then
-    echo "❌ Niet alle scripts konden worden gekopieerd. Installatie afgebroken."
+    echo "❌ Not all scripts could be copied. Installation aborted."
     exit 1
 fi
 
 chmod +x "$TARGET_DIR"/*.sh
 
-# ── Symlink naar ~/Scripts/mac-maintenance ───────────────
+# ── Symlink to ~/Scripts/mac-maintenance ─────────────────
 
 ln -sfn "$REPO_ROOT" "$SYMLINK_PATH"
 
-# ── Command wrapper mm aanmaken ──────────────────────────
+# ── Create mm command wrapper ────────────────────────────
 
 cat > "$MM_PATH" <<'EOF'
 #!/bin/zsh
@@ -105,16 +105,16 @@ case "$1" in
     "$HOME/Scripts/mac-maintenance/scripts/mac_triage.sh" "$@"
     ;;
   help|"")
-    echo "Gebruik:"
-    echo "  mm auto     # automatische maintenance"
-    echo "  mm manual   # manueel onderhoud"
-    echo "  mm install  # setup uitvoeren"
-    echo "  mm doctor   # setup controleren"
-    echo "  mm triage   # snelle file/malware triage"
+    echo "Usage:"
+    echo "  mm auto     # automated maintenance"
+    echo "  mm manual   # manual maintenance"
+    echo "  mm install  # run setup"
+    echo "  mm doctor   # check setup health"
+    echo "  mm triage   # quick file/malware triage"
     ;;
   *)
-    echo "Onbekend commando: $1"
-    echo "Gebruik: mm help"
+    echo "Unknown command: $1"
+    echo "Usage: mm help"
     exit 1
     ;;
 esac
@@ -122,9 +122,9 @@ EOF
 
 chmod +x "$MM_PATH"
 
-# ── Gedeelde functies en config laden ────────────────────
-# Vanaf hier loopt alles vanuit de repo-locatie (TARGET_DIR).
-# SCRIPTS_DIR in mac_common.sh wijst dan correct naar TARGET_DIR.
+# ── Load shared functions and config ─────────────────────
+# From here on, everything runs from the repo location (TARGET_DIR).
+# SCRIPTS_DIR in mac_common.sh then points to TARGET_DIR correctly.
 
 source "$TARGET_DIR/mac_common.sh"
 mkdir -p "$LOG_DIR"
@@ -132,29 +132,29 @@ mkdir -p "$LOG_DIR"
 # ── Homebrew ─────────────────────────
 
 if ensure_brew; then
-    log_ok "Homebrew beschikbaar"
+    log_ok "Homebrew available"
 else
-    log_warn "Homebrew installatie mislukt"
+    log_warn "Homebrew installation failed"
     exit 1
 fi
 
 run_step "brew update" brew update
 
-# ── Apps installeren ─────────────────
+# ── Install apps ─────────────────────
 
 for pkg in "${MANAGED_CASKS[@]}"; do
     if brew list --cask "$pkg" &>/dev/null; then
-        log_ok "$pkg al aanwezig"
+        log_ok "$pkg already installed"
     else
-        run_step "$pkg installeren" brew install --cask "$pkg"
+        run_step "install $pkg" brew install --cask "$pkg"
     fi
 done
 
 for pkg in "${CLI_TOOLS[@]}"; do
     if brew list "$pkg" &>/dev/null; then
-        log_ok "$pkg al aanwezig"
+        log_ok "$pkg already installed"
     else
-        run_step "$pkg installeren" brew install "$pkg"
+        run_step "install $pkg" brew install "$pkg"
     fi
 done
 
@@ -165,26 +165,26 @@ run_step "brew cleanup" brew cleanup
 write_auto_launch_agent
 
 if load_auto_launch_agent; then
-    log_ok "Auto-maintenance ingepland voor zaterdag $(printf '%02d:%02d' "$AUTO_HOUR" "$AUTO_MINUTE")"
+    log_ok "Auto-maintenance scheduled for Saturday $(printf '%02d:%02d' "$AUTO_HOUR" "$AUTO_MINUTE")"
 else
-    log_warn "LaunchAgent laden mislukt"
+    log_warn "Failed to load LaunchAgent"
 fi
 
 # ── iCloud bootstrap copy ───────────
 sync_scripts_to_icloud
 
-# ── Samenvatting ─────────────────────
+# ── Summary ──────────────────────────
 
 summary_print
 
 echo
-echo "── 📁 Installatiepaden ───────────────────────────"
+echo "── 📁 Installation paths ─────────────────────────"
 log_ok "Repo:    $REPO_ROOT"
 log_ok "Symlink: $SYMLINK_PATH"
 log_ok "Command: $MM_PATH"
 
 if ! echo "$PATH" | tr ':' '\n' | grep -Fxq "$HOME/Scripts/bin"; then
     echo ""
-    log_warn "Zorg dat ~/Scripts/bin in je PATH staat (bv. in ~/.zshrc of ~/.bash_profile):"
+    log_warn "Make sure ~/Scripts/bin is in your PATH (for example in ~/.zshrc or ~/.bash_profile):"
     echo '         export PATH="$HOME/Scripts/bin:$PATH"'
 fi

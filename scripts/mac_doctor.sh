@@ -1,7 +1,7 @@
 #!/bin/bash
 # =========================================================
 # mac_doctor.sh
-# Controleert de gezondheid van de mac-maintenance setup
+# Checks the health of the mac-maintenance setup
 # =========================================================
 
 set -o pipefail
@@ -41,21 +41,21 @@ echo
 # ── PATH ────────────────────────────────────────────────
 
 if echo "$PATH" | tr ':' '\n' | grep -Fxq "$HOME/Scripts/bin"; then
-    check_ok "PATH bevat ~/Scripts/bin"
+    check_ok "PATH contains ~/Scripts/bin"
 else
-    check_fail "PATH bevat ~/Scripts/bin niet"
-    echo '   Voeg toe in ~/.zshrc: export PATH="$HOME/Scripts/bin:$PATH"'
+    check_fail "PATH does not contain ~/Scripts/bin"
+    echo '   Add this to ~/.zshrc: export PATH="$HOME/Scripts/bin:$PATH"'
 fi
 
 if command -v mm >/dev/null 2>&1; then
     MM_FOUND="$(command -v mm)"
     if [[ "$MM_FOUND" == "$MM_PATH" ]]; then
-        check_ok "mm gevonden op juiste locatie: $MM_FOUND"
+        check_ok "mm found at the expected location: $MM_FOUND"
     else
-        check_warn "mm gevonden op onverwachte locatie: $MM_FOUND"
+        check_warn "mm found at an unexpected location: $MM_FOUND"
     fi
 else
-    check_fail "mm niet gevonden in PATH"
+    check_fail "mm not found in PATH"
 fi
 
 # ── Symlink ─────────────────────────────────────────────
@@ -65,59 +65,59 @@ if [[ -L "$SYMLINK_PATH" ]]; then
     if [[ "$TARGET" == "$REPO_ROOT" ]]; then
         check_ok "Symlink correct: $SYMLINK_PATH -> $TARGET"
     else
-        check_fail "Symlink wijst fout: $SYMLINK_PATH -> $TARGET"
+        check_fail "Symlink points to the wrong target: $SYMLINK_PATH -> $TARGET"
     fi
 elif [[ -e "$SYMLINK_PATH" ]]; then
-    check_fail "$SYMLINK_PATH bestaat, maar is geen symlink"
+    check_fail "$SYMLINK_PATH exists, but is not a symlink"
 else
-    check_fail "Symlink ontbreekt: $SYMLINK_PATH"
+    check_fail "Symlink missing: $SYMLINK_PATH"
 fi
 
 # ── Repo / scripts ──────────────────────────────────────
 
 if [[ -d "$REPO_ROOT/scripts" ]]; then
-    check_ok "Repo scripts-map bestaat: $REPO_ROOT/scripts"
+    check_ok "Repo scripts folder exists: $REPO_ROOT/scripts"
 else
-    check_fail "Repo scripts-map ontbreekt: $REPO_ROOT/scripts"
+    check_fail "Repo scripts folder missing: $REPO_ROOT/scripts"
 fi
 
-for f in mac_common.sh mac_auto.sh mac_manual.sh mac_install.sh mac_doctor.sh; do
+for f in mac_common.sh mac_auto.sh mac_manual.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
     FILE_PATH="$REPO_ROOT/scripts/$f"
     if [[ -f "$FILE_PATH" ]]; then
-        check_ok "$f aanwezig"
+        check_ok "$f present"
         if [[ -x "$FILE_PATH" ]]; then
-            check_ok "$f is uitvoerbaar"
+            check_ok "$f is executable"
         else
-            check_warn "$f is niet uitvoerbaar"
+            check_warn "$f is not executable"
         fi
     else
-        check_fail "$f ontbreekt"
+        check_fail "$f missing"
     fi
 done
 
 if [[ -f "$MM_PATH" ]]; then
-    check_ok "Wrapper aanwezig: $MM_PATH"
+    check_ok "Wrapper present: $MM_PATH"
     if [[ -x "$MM_PATH" ]]; then
-        check_ok "Wrapper is uitvoerbaar"
+        check_ok "Wrapper is executable"
     else
-        check_fail "Wrapper is niet uitvoerbaar"
+        check_fail "Wrapper is not executable"
     fi
 else
-    check_fail "Wrapper ontbreekt: $MM_PATH"
+    check_fail "Wrapper missing: $MM_PATH"
 fi
 
 # ── LaunchAgent ─────────────────────────────────────────
 
 if [[ -f "$LAUNCH_AGENT_PATH" ]]; then
-    check_ok "LaunchAgent plist aanwezig"
+    check_ok "LaunchAgent plist present"
 else
-    check_fail "LaunchAgent plist ontbreekt: $LAUNCH_AGENT_PATH"
+    check_fail "LaunchAgent plist missing: $LAUNCH_AGENT_PATH"
 fi
 
 if launchctl print "gui/$(id -u)/$LAUNCH_AGENT_LABEL" >/dev/null 2>&1; then
-    check_ok "LaunchAgent geladen: $LAUNCH_AGENT_LABEL"
+    check_ok "LaunchAgent loaded: $LAUNCH_AGENT_LABEL"
 else
-    check_warn "LaunchAgent niet geladen: $LAUNCH_AGENT_LABEL"
+    check_warn "LaunchAgent not loaded: $LAUNCH_AGENT_LABEL"
 fi
 
 if [[ -f "$LAUNCH_AGENT_PATH" ]]; then
@@ -125,9 +125,9 @@ if [[ -f "$LAUNCH_AGENT_PATH" ]]; then
     EXPECTED_SYMLINK="$SYMLINK_PATH/scripts/mac_auto.sh"
 
     if grep -Fq "$EXPECTED_REPO" "$LAUNCH_AGENT_PATH" || grep -Fq "$EXPECTED_SYMLINK" "$LAUNCH_AGENT_PATH"; then
-        check_ok "LaunchAgent verwijst naar juiste mac_auto.sh"
+        check_ok "LaunchAgent points to the expected mac_auto.sh"
     else
-        check_fail "LaunchAgent verwijst niet naar verwachte mac_auto.sh"
+        check_fail "LaunchAgent does not point to the expected mac_auto.sh"
     fi
 fi
 
@@ -135,56 +135,56 @@ fi
 
 if command -v brew >/dev/null 2>&1; then
     BREW_PATH="$(command -v brew)"
-    check_ok "Homebrew gevonden: $BREW_PATH"
+    check_ok "Homebrew found: $BREW_PATH"
 
     if brew --version >/dev/null 2>&1; then
-        check_ok "Homebrew werkt"
+        check_ok "Homebrew works"
     else
-        check_fail "Homebrew commando faalt"
+        check_fail "Homebrew command fails"
     fi
 
     OUTDATED_COUNT="$(brew outdated | wc -l | tr -d ' ')"
     if [[ "${OUTDATED_COUNT:-0}" -eq 0 ]]; then
-        check_ok "Geen verouderde Homebrew packages"
+        check_ok "No outdated Homebrew packages"
     else
-        check_warn "$OUTDATED_COUNT verouderde Homebrew package(s)"
+        check_warn "$OUTDATED_COUNT outdated Homebrew package(s)"
     fi
 else
-    check_fail "Homebrew niet gevonden"
+    check_fail "Homebrew not found"
 fi
 
 # ── Logs ────────────────────────────────────────────────
 
 if [[ -d "$LOG_DIR" ]]; then
-    check_ok "Logmap bestaat: $LOG_DIR"
+    check_ok "Log folder exists: $LOG_DIR"
 else
-    check_warn "Logmap ontbreekt: $LOG_DIR"
+    check_warn "Log folder missing: $LOG_DIR"
 fi
 
 TEST_LOG="$LOG_DIR/.doctor-write-test"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 if touch "$TEST_LOG" 2>/dev/null; then
     rm -f "$TEST_LOG"
-    check_ok "Logmap is schrijfbaar"
+    check_ok "Log folder is writable"
 else
-    check_fail "Logmap is niet schrijfbaar"
+    check_fail "Log folder is not writable"
 fi
 
-# ── Netwerk ─────────────────────────────────────────────
+# ── Network ─────────────────────────────────────────────
 
 if ping -c 1 -W 1000 1.1.1.1 >/dev/null 2>&1; then
-    check_ok "Netwerkverbinding lijkt OK"
+    check_ok "Network connection looks OK"
 else
-    check_warn "Netwerktest naar 1.1.1.1 mislukt"
+    check_warn "Network test to 1.1.1.1 failed"
 fi
 
-# ── Samenvatting ────────────────────────────────────────
+# ── Summary ─────────────────────────────────────────────
 
 echo
-echo "── 📊 Doctor samenvatting ─────────────────────────"
+echo "── 📊 Doctor summary ──────────────────────────────"
 echo "✅ OK:            $OK_COUNT"
-echo "⚠️  Waarschuwingen: $WARN_COUNT"
-echo "❌ Problemen:      $FAIL_COUNT"
+echo "⚠️  Warnings:      $WARN_COUNT"
+echo "❌ Problems:      $FAIL_COUNT"
 
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
     exit 1

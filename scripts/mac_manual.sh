@@ -1,19 +1,19 @@
 #!/bin/bash
 # =========================================================
 # mac_manual.sh
-# Handmatig onderhoud en systeemcontrole
+# Manual maintenance and system checks
 #
-# Gebruik (na installatie):
+# Usage (after installation):
 #   mm manual
-#   of
+#   or
 #   bash ~/Scripts/mac-maintenance/scripts/mac_manual.sh
 #
-# Wat dit script doet:
-#   - brew doctor uitvoeren
-#   - DNS-cache flushen
-#   - macOS updates detecteren en optioneel installeren
+# What this script does:
+#   - Runs brew doctor
+#   - Flushes the DNS cache
+#   - Detects and optionally installs macOS updates
 #
-# Vereist sudo (wordt éénmalig gevraagd bij opstart).
+# Requires sudo (requested once on startup).
 # =========================================================
 
 set -o pipefail
@@ -23,12 +23,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/mac_common.sh"
 
 # ── Sudo ─────────────────────────────
-# sudo -v vraagt het wachtwoord éénmalig op en valideert de sessie.
-# De keepalive-loop verlengt de sudo-timestamp elke 50 seconden,
-# zodat langlopende stappen (bv. softwareupdate) niet blokkeren.
+# sudo -v asks for the password once and validates the session.
+# The keepalive loop refreshes the sudo timestamp every 50 seconds,
+# so long-running steps (for example softwareupdate) do not block.
 
 if ! sudo -v; then
-    echo "Sudo mislukt — script afgebroken."
+    echo "Sudo failed — script aborted."
     exit 1
 fi
 
@@ -43,31 +43,31 @@ trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true' EXIT
 mkdir -p "$LOG_DIR"
 exec > >(tee -a "$LOG_DIR/manual_$(date '+%Y-%m-%d_%H-%M-%S').log") 2>&1
 
-notify_user "Mac onderhoud gestart" "Manuele maintenance gestart."
+notify_user "Mac maintenance started" "Manual maintenance started."
 
-echo "── 🔍 Manueel onderhoud ──"
+echo "── 🔍 Manual maintenance ──"
 
 # ── Brew doctor ──────────────────────
-# brew doctor geeft exit 0 bij een gezond systeem, anders exit 1.
-# We tonen de volledige output en loggen op basis van de exit code,
-# niet via grep op de output (robuuster bij taalvariaties in Homebrew).
+# brew doctor exits with 0 on a healthy system, otherwise 1.
+# We show the full output and log based on the exit code,
+# not by grepping the output (more robust across Homebrew text changes).
 
 if brew doctor; then
     log_ok "brew doctor OK"
 else
-    log_warn "brew doctor gaf waarschuwingen — zie output hierboven"
+    log_warn "brew doctor reported warnings — see output above"
 fi
 
 # ── DNS flush ────────────────────────
 
 if sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder; then
-    log_ok "DNS-cache geleegd"
+    log_ok "DNS cache flushed"
 else
-    log_warn "DNS flush mislukt"
+    log_warn "DNS flush failed"
 fi
 
 # ── macOS updates ────────────────────
-# grep -c geeft exit 1 bij 0 matches; de subshell vangt dit op met || echo 0.
+# grep -c exits with 1 for 0 matches; || true handles that.
 
 UPDATES="$(/usr/sbin/softwareupdate --list 2>&1 || true)"
 echo "$UPDATES"
@@ -76,28 +76,28 @@ COUNT=$(echo "$UPDATES" | grep -cE '^[[:space:]]*\*' || true)
 COUNT=${COUNT:-0}
 
 if [[ "$COUNT" -eq 0 ]]; then
-    log_ok "Geen macOS updates beschikbaar"
+    log_ok "No macOS updates available"
 else
-    log_warn "$COUNT macOS update(s) beschikbaar"
+    log_warn "$COUNT macOS update(s) available"
 
-    read -r -p "   Updates installeren? (y/N): " confirm
+    read -r -p "   Install updates? (y/N): " confirm
 
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
         INSTALL_OUT="$(sudo /usr/sbin/softwareupdate --install --all 2>&1 || true)"
         echo "$INSTALL_OUT"
 
         if echo "$INSTALL_OUT" | grep -q "No updates are available"; then
-            log_info "Geen updates meer beschikbaar"
+            log_info "No updates available anymore"
         elif echo "$INSTALL_OUT" | grep -qiE "installed|Done|restart"; then
-            log_ok "Updates uitgevoerd"
+            log_ok "Updates installed"
         else
-            log_warn "Update resultaat onduidelijk — controleer output hierboven"
+            log_warn "Update result unclear — check output above"
         fi
     else
-        log_info "Updates overgeslagen"
+        log_info "Updates skipped"
     fi
 fi
 
-notify_user "Mac onderhoud voltooid" "Manuele maintenance afgerond."
+notify_user "Mac maintenance completed" "Manual maintenance finished."
 
 summary_print
