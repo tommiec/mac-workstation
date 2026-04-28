@@ -123,8 +123,9 @@ The installer installs both the VirusTotal GUI app and `virustotal-cli`. The tri
 ## Notes
 
 - Uses a LaunchAgent (user context, no root daemon)
+- Writes logs and last-run status under `~/Library/Logs/mac_maintenance/`
 - Safe to re-run `mm install` at any time
-- `mm doctor` can be used to validate the setup
+- `mm doctor` can be used to validate the setup and inspect the last recorded run for each script
 
 ## License
 

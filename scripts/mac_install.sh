@@ -128,6 +128,7 @@ chmod +x "$MM_PATH"
 
 source "$TARGET_DIR/mac_common.sh"
 mkdir -p "$LOG_DIR"
+trap 'status=$?; record_script_result "mac_install.sh" "$status"' EXIT
 
 # ── Homebrew ─────────────────────────
 

@@ -9,12 +9,7 @@ set -u
 
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPTS_DIR/mac_common.sh"
-
-REPO_ROOT="$HOME/Repositories/mac-maintenance"
-SCRIPTS_ROOT="$HOME/Scripts"
-SYMLINK_PATH="$SCRIPTS_ROOT/mac-maintenance"
-BIN_DIR="$SCRIPTS_ROOT/bin"
-MM_PATH="$BIN_DIR/mm"
+trap 'status=$?; record_script_result "mac_doctor.sh" "$status"' EXIT
 
 OK_COUNT=0
 WARN_COUNT=0
@@ -177,6 +172,34 @@ if ping -c 1 -W 1000 1.1.1.1 >/dev/null 2>&1; then
 else
     check_warn "Network test to 1.1.1.1 failed"
 fi
+
+# ── Last runs ───────────────────────────────────────────
+
+echo
+echo "── 🧾 Last script runs ───────────────────────────"
+for script in mac_auto.sh mac_manual.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
+    STATUS_FILE="$SCRIPT_STATUS_DIR/$script.status"
+
+    if [[ ! -f "$STATUS_FILE" ]]; then
+        check_warn "$script last run: never recorded"
+        continue
+    fi
+
+    STATUS="$(grep -E '^status=' "$STATUS_FILE" 2>/dev/null | head -n 1 | cut -d= -f2-)"
+    EXIT_CODE="$(grep -E '^exit_code=' "$STATUS_FILE" 2>/dev/null | head -n 1 | cut -d= -f2-)"
+    FINISHED_AT="$(grep -E '^finished_at=' "$STATUS_FILE" 2>/dev/null | head -n 1 | cut -d= -f2-)"
+    LOG_FILE="$(grep -E '^log_file=' "$STATUS_FILE" 2>/dev/null | head -n 1 | cut -d= -f2-)"
+
+    if [[ "$STATUS" == "success" ]]; then
+        check_ok "$script last run: $FINISHED_AT (success, exit $EXIT_CODE)"
+    else
+        check_warn "$script last run: $FINISHED_AT (${STATUS:-unknown}, exit ${EXIT_CODE:-unknown})"
+    fi
+
+    if [[ -n "$LOG_FILE" ]]; then
+        echo "   Log: $LOG_FILE"
+    fi
+done
 
 # ── Summary ─────────────────────────────────────────────
 

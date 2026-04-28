@@ -27,6 +27,7 @@
 
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="$HOME/Library/Logs/mac_maintenance"
+SCRIPT_STATUS_DIR="$LOG_DIR/status"
 REPO_ROOT="$HOME/Repositories/mac-maintenance"
 SCRIPTS_ROOT="$HOME/Scripts"
 SYMLINK_PATH="$SCRIPTS_ROOT/mac-maintenance"
@@ -88,6 +89,31 @@ log_warn() {
 
 log_info() {
     echo "   ℹ️  $*"
+}
+
+record_script_result() {
+    local script_name="$1"
+    local exit_code="$2"
+    local log_file="${3:-}"
+    local status="success"
+    local status_file="$SCRIPT_STATUS_DIR/$script_name.status"
+    local tmp_file="$status_file.tmp"
+
+    if [[ "$exit_code" -ne 0 ]]; then
+        status="failed"
+    fi
+
+    mkdir -p "$SCRIPT_STATUS_DIR" 2>/dev/null || return 0
+    if ! {
+        echo "script=$script_name"
+        echo "status=$status"
+        echo "exit_code=$exit_code"
+        echo "finished_at=$(date '+%Y-%m-%d %H:%M:%S %z')"
+        echo "log_file=$log_file"
+    } > "$tmp_file" 2>/dev/null; then
+        return 0
+    fi
+    mv "$tmp_file" "$status_file" 2>/dev/null || true
 }
 
 # Runs a command and logs the result based on its exit code.

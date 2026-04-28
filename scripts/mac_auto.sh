@@ -20,7 +20,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/mac_common.sh"
 
 mkdir -p "$LOG_DIR"
-exec > >(tee -a "$LOG_DIR/auto_$(date '+%Y-%m-%d_%H-%M-%S').log") 2>&1
+RUN_LOG="$LOG_DIR/auto_$(date '+%Y-%m-%d_%H-%M-%S').log"
+exec > >(tee -a "$RUN_LOG") 2>&1
+trap 'status=$?; record_script_result "mac_auto.sh" "$status" "$RUN_LOG"' EXIT
 
 notify_user "Mac maintenance started" "Automated maintenance started."
 

@@ -22,6 +22,8 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/mac_common.sh"
 
+RUN_LOG="$LOG_DIR/manual_$(date '+%Y-%m-%d_%H-%M-%S').log"
+
 # ── Sudo ─────────────────────────────
 # sudo -v asks for the password once and validates the session.
 # The keepalive loop refreshes the sudo timestamp every 50 seconds,
@@ -38,10 +40,10 @@ while true; do
     kill -0 "$$" || exit
 done 2>/dev/null &
 SUDO_KEEPALIVE_PID=$!
-trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true' EXIT
+trap 'status=$?; kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true; record_script_result "mac_manual.sh" "$status" "$RUN_LOG"' EXIT
 
 mkdir -p "$LOG_DIR"
-exec > >(tee -a "$LOG_DIR/manual_$(date '+%Y-%m-%d_%H-%M-%S').log") 2>&1
+exec > >(tee -a "$RUN_LOG") 2>&1
 
 notify_user "Mac maintenance started" "Manual maintenance started."
 
