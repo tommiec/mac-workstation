@@ -12,7 +12,7 @@ One-time setup. Runs automatically. Manual control when needed.
 
 | Script | Purpose |
 |---|---|
-| `mac_install.sh` | Bootstrap setup (repo, symlink, CLI, launchd) |
+| `mac_install.sh` | Bootstrap setup (local copy, symlink, CLI, launchd) |
 | `mac_auto.sh` | Automated weekly maintenance (launchd) |
 | `mac_manual.sh` | Manual diagnostics and updates |
 | `mac_doctor.sh` | Health checks and diagnostics (`mm doctor`) |
@@ -21,53 +21,65 @@ One-time setup. Runs automatically. Manual control when needed.
 
 ## How it works
 
-Scripts are managed using a **repo + symlink + CLI model**:
+Scripts are managed using a **local copy + symlink + CLI model**:
 
 ```
-~/Repositories/mac-maintenance          → source of truth (git repo)
-~/Scripts/mac-maintenance               → symlink to repo
+~/Repositories/mac-maintenance          → local installed copy
+~/Scripts/mac-maintenance               → symlink to local copy
 ~/Scripts/bin/mm                        → CLI entrypoint
 ~/Library/Logs/mac_maintenance/         → logs
 ```
 
-- The repo contains all scripts and is version-controlled
+- The local copy contains all scripts
 - A symlink provides a stable runtime path
 - The `mm` command provides a simple interface
 - launchd runs the auto-maintenance script from the symlinked location
 
 ## Installation
 
-Clone the repository and run the installer once:
+### Regular install
+
+Use this on a Mac where you just want to install and run the tool. No git workflow is needed.
+
+Download the latest GitHub archive and run the installer:
 
 ```bash
-git clone https://github.com/tommiec/mac-maintenance.git ~/Repositories/mac-maintenance
-bash ~/Repositories/mac-maintenance/scripts/mac_install.sh
+tmp_dir="$(mktemp -d)"
+curl -L https://github.com/tommiec/mac-maintenance/archive/refs/heads/main.tar.gz -o "$tmp_dir/mac-maintenance.tar.gz"
+tar -xzf "$tmp_dir/mac-maintenance.tar.gz" -C "$tmp_dir" --strip-components=1
+bash "$tmp_dir/scripts/mac_install.sh"
 ```
+
+To update an existing regular install later, run the same command again.
 
 The installer will:
 - set up Homebrew (if needed)
 - install required packages
+- copy the scripts to `~/Repositories/mac-maintenance`
 - create the symlink under `~/Scripts/mac-maintenance`
 - install the `mm` command in `~/Scripts/bin`
 - register the weekly launchd job
 
-## Bootstrap options
+### Maintainer install
 
-The **GitHub repository is the source of truth** for this project. All changes should be committed there.
-
-There are two supported ways to bootstrap a new Mac:
-
-### Option 1 — GitHub (recommended)
+Use this when you want to edit the scripts, commit changes, or keep a real git checkout on the machine.
 
 ```bash
 git clone https://github.com/tommiec/mac-maintenance.git ~/Repositories/mac-maintenance
 bash ~/Repositories/mac-maintenance/scripts/mac_install.sh
 ```
 
-- Always up to date
-- Preferred for first setup or clean installs
+To update a maintainer install later:
 
-### Option 2 — iCloud Drive (convenience)
+```bash
+cd ~/Repositories/mac-maintenance
+git pull --ff-only
+mm install
+```
+
+The **GitHub repository is the source of truth** for development. All changes should be committed there.
+
+### iCloud bootstrap
 
 If you already have a synced copy in iCloud Drive, you can run the installer from there:
 
@@ -76,13 +88,11 @@ bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-maintenance/scr
 ```
 
 - Useful when Git is not yet configured
-- Acts as a bootstrap/fallback mechanism
+- Acts as a personal bootstrap/fallback mechanism
 
-⚠️ The installer copies scripts from the directory you run `mac_install.sh` from into `~/Repositories/mac-maintenance`. If you run it from iCloud, that copy is used; if you run it from the repo, the repo is used. This keeps bootstrap flexible for different setup scenarios.
+The installer copies scripts from the directory you run `mac_install.sh` from into `~/Repositories/mac-maintenance`. If you run it from iCloud, that copy is used; if you run it from a git checkout, that checkout is used. This keeps bootstrap flexible for different setup scenarios.
 
-To avoid drift:
-- treat GitHub as the canonical source
-- keep any iCloud copy in sync (or regenerate it from the repo)
+For development, treat GitHub as the canonical source and keep any iCloud copy in sync from the git checkout.
 
 ## Usage
 

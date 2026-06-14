@@ -103,36 +103,32 @@ fi
 
 # ── GitHub version ──────────────────────────────────────
 
-if command -v git >/dev/null 2>&1; then
-    check_ok "git found"
+if [[ -d "$REPO_ROOT/.git" ]]; then
+    check_ok "Repo is a git checkout"
 
-    if [[ -d "$REPO_ROOT/.git" ]]; then
-        check_ok "Repo is a git checkout"
+    if command -v git >/dev/null 2>&1; then
+        check_ok "git found"
 
         REMOTE_URL="$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || true)"
         if [[ -z "$REMOTE_URL" ]]; then
             check_warn "Git remote 'origin' is not configured"
-        else
-            check_ok "Git remote configured: origin ($REMOTE_URL)"
+        elif GIT_TERMINAL_PROMPT=0 git -C "$REPO_ROOT" fetch --quiet origin main; then
+            LOCAL_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
+            REMOTE_SHA="$(git -C "$REPO_ROOT" rev-parse origin/main 2>/dev/null || true)"
 
-            if GIT_TERMINAL_PROMPT=0 git -C "$REPO_ROOT" fetch --quiet origin main; then
-                LOCAL_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
-                REMOTE_SHA="$(git -C "$REPO_ROOT" rev-parse origin/main 2>/dev/null || true)"
-
-                if [[ -n "$LOCAL_SHA" && "$LOCAL_SHA" == "$REMOTE_SHA" ]]; then
-                    check_ok "Local repo is up to date with origin/main"
-                else
-                    check_warn "Local repo does not match origin/main; run 'git pull --ff-only'"
-                fi
+            if [[ -n "$LOCAL_SHA" && "$LOCAL_SHA" == "$REMOTE_SHA" ]]; then
+                check_ok "Local repo is up to date with origin/main"
             else
-                check_warn "Could not fetch latest version from GitHub"
+                check_warn "Local repo does not match origin/main; run 'git pull --ff-only'"
             fi
+        else
+            check_warn "Could not fetch latest version from GitHub"
         fi
     else
-        check_warn "Repo is not a git checkout: $REPO_ROOT"
+        check_warn "Repo is a git checkout, but git is not available"
     fi
 else
-    check_warn "git not found; GitHub version check skipped"
+    check_ok "Plain install copy detected; GitHub version check skipped"
 fi
 
 # ── LaunchAgent ─────────────────────────────────────────
