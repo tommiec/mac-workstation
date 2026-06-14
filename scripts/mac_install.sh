@@ -23,7 +23,7 @@
 #
 # After installation:
 #   mm auto
-#   mm manual
+#   mm run
 #   mm install
 #   mm doctor
 # =========================================================
@@ -53,7 +53,7 @@ echo "── 🚀 Installation started ──"
 # always runs the latest installed version.
 
 COPY_OK=true
-for f in mac_common.sh mac_auto.sh mac_manual.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
+for f in mac_common.sh mac_auto.sh mac_run.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
     SRC="$SRC_DIR/$f"
     DST="$TARGET_DIR/$f"
 
@@ -90,7 +90,7 @@ case "$1" in
     ;;
   manual)
     shift
-    "$HOME/Scripts/mac-maintenance/scripts/mac_manual.sh" "$@"
+    "$HOME/Scripts/mac-maintenance/scripts/mac_run.sh" "$@"
     ;;
   install)
     shift
@@ -107,7 +107,7 @@ case "$1" in
   help|"")
     echo "Usage:"
     echo "  mm auto     # automated maintenance"
-    echo "  mm manual   # manual maintenance"
+    echo "  mm run      # run maintenance now"
     echo "  mm install  # run setup"
     echo "  mm doctor   # check setup health"
     echo "  mm triage   # quick file/malware triage"

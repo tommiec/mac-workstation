@@ -16,7 +16,7 @@ One-time setup. Runs automatically. Manual control when needed.
 |---|---|
 | `mac_install.sh` | Bootstrap setup (repo, symlink, CLI, launchd) |
 | `mac_auto.sh` | Automated weekly maintenance (launchd) |
-| `mac_manual.sh` | Manual diagnostics and updates |
+| `mac_run.sh` | Run maintenance now: Homebrew, DNS flush, macOS updates |
 | `mac_doctor.sh` | Health checks and diagnostics (`mm doctor`) |
 | `mac_triage.sh` | Quick file/malware triage with hash, VirusTotal and strings (`mm triage`) |
 | `mac_common.sh` | Shared configuration and helpers (app list lives here) |
@@ -80,7 +80,7 @@ Useful on a new Mac before Git is configured. The installer copies scripts from 
 
 ```bash
 mm auto     # run automated maintenance now
-mm manual   # run manual diagnostics and updates
+mm run      # run maintenance now
 mm install  # re-run setup
 mm doctor   # check system health
 mm triage <file>  # inspect a suspicious file

@@ -1,12 +1,12 @@
 #!/bin/bash
 # =========================================================
-# mac_manual.sh
-# Manual maintenance and system checks
+# mac_run.sh
+# Run maintenance now: Homebrew, DNS flush, macOS updates
 #
 # Usage (after installation):
-#   mm manual
+#   mm run
 #   or
-#   bash ~/Scripts/mac-maintenance/scripts/mac_manual.sh
+#   bash ~/Scripts/mac-maintenance/scripts/mac_run.sh
 #
 # What this script does:
 #   - Runs brew doctor
@@ -40,7 +40,7 @@ while true; do
     kill -0 "$$" || exit
 done 2>/dev/null &
 SUDO_KEEPALIVE_PID=$!
-trap 'status=$?; kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true; record_script_result "mac_manual.sh" "$status" "$RUN_LOG"' EXIT
+trap 'status=$?; kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true; record_script_result "mac_run.sh" "$status" "$RUN_LOG"' EXIT
 
 mkdir -p "$LOG_DIR"
 exec > >(tee -a "$RUN_LOG") 2>&1

@@ -8,6 +8,7 @@
 # Schedule: every Saturday at 02:00
 #
 # What this script does:
+#   - Pulls the latest scripts from GitHub (git checkout only)
 #   - Updates and cleans up Homebrew formulas
 #   - Detects macOS updates and reports them through a notification
 #   - Deletes old cache files (>7 days)
@@ -28,6 +29,16 @@ notify_user "Mac maintenance started" "Automated maintenance started."
 
 echo "── ⚡ Auto maintenance ──"
 
+# ── Self-update ──────────────────────
+
+if [[ -d "$REPO_ROOT/.git" ]] && command -v git &>/dev/null; then
+    if GIT_TERMINAL_PROMPT=0 git -C "$REPO_ROOT" pull --ff-only --quiet 2>/dev/null; then
+        log_ok "Scripts updated from GitHub"
+    else
+        log_warn "Script update failed (offline or diverged); continuing with local version"
+    fi
+fi
+
 # ── Brew ─────────────────────────────
 # brew is checked through command -v, not ensure_brew:
 # in a scheduled night job, we do not want to start an interactive Homebrew install.
@@ -42,7 +53,7 @@ else
 fi
 
 # ── macOS updates ────────────────────
-# Detect and report only; installation happens through 'mm manual'.
+# Detect and report only; installation happens through 'mm run'.
 # softwareupdate --list writes to stderr; 2>&1 captures it.
 # grep -c exits with 1 for 0 matches; || true handles that.
 
@@ -54,7 +65,7 @@ if [[ "$COUNT" -eq 0 ]]; then
     log_ok "No macOS updates available"
 else
     log_warn "$COUNT macOS update(s) available"
-    notify_user "macOS updates available" "Use 'mm manual' to install them."
+    notify_user "macOS updates available" "Use 'mm run' to install them."
 fi
 
 # ── Cache cleanup ────────────────────

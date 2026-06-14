@@ -76,7 +76,7 @@ else
     check_fail "Repo scripts folder missing: $REPO_ROOT/scripts"
 fi
 
-for f in mac_common.sh mac_auto.sh mac_manual.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
+for f in mac_common.sh mac_auto.sh mac_run.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
     FILE_PATH="$REPO_ROOT/scripts/$f"
     if [[ -f "$FILE_PATH" ]]; then
         check_ok "$f present"
@@ -112,18 +112,16 @@ if [[ -d "$REPO_ROOT/.git" ]]; then
         REMOTE_URL="$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || true)"
         if [[ -z "$REMOTE_URL" ]]; then
             check_warn "Git remote 'origin' is not configured"
-        elif GIT_TERMINAL_PROMPT=0 git -C "$REPO_ROOT" fetch --quiet origin main 2>/dev/null; then
-            check_ok "Git remote: origin ($REMOTE_URL)"
-            LOCAL_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
-            REMOTE_SHA="$(git -C "$REPO_ROOT" rev-parse origin/main 2>/dev/null || true)"
-
-            if [[ -n "$LOCAL_SHA" && "$LOCAL_SHA" == "$REMOTE_SHA" ]]; then
-                check_ok "Local repo is up to date with origin/main"
-            else
-                check_warn "Local repo does not match origin/main; run 'git pull --ff-only'"
-            fi
         else
-            check_warn "Could not fetch latest version from GitHub"
+            check_ok "Git remote: origin ($REMOTE_URL)"
+            PULL_OUT="$(GIT_TERMINAL_PROMPT=0 git -C "$REPO_ROOT" pull --ff-only 2>&1 || true)"
+            if echo "$PULL_OUT" | grep -q "Already up to date"; then
+                check_ok "Scripts already up to date"
+            elif echo "$PULL_OUT" | grep -qE "Fast-forward|Updating"; then
+                check_ok "Scripts updated from GitHub"
+            else
+                check_warn "Could not update from GitHub (offline or diverged)"
+            fi
         fi
     else
         check_warn "Repo is a git checkout, but git is not available"
@@ -143,7 +141,7 @@ else
         fi
 
         if [[ "$GITHUB_FETCH_FAILED" -eq 0 ]]; then
-            for f in mac_common.sh mac_auto.sh mac_manual.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
+            for f in mac_common.sh mac_auto.sh mac_run.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
                 LOCAL_FILE="$REPO_ROOT/scripts/$f"
                 REMOTE_FILE="$TMP_GITHUB_DIR/$f"
 
@@ -250,7 +248,7 @@ fi
 
 echo
 echo "── 🧾 Last script runs ───────────────────────────"
-for script in mac_auto.sh mac_manual.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
+for script in mac_auto.sh mac_run.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
     STATUS_FILE="$SCRIPT_STATUS_DIR/$script.status"
 
     if [[ ! -f "$STATUS_FILE" ]]; then
