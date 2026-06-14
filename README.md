@@ -60,7 +60,7 @@ cd ~/Repositories/mac-maintenance
 git pull --ff-only
 ```
 
-Run `mm install` only if you changed the app list or the LaunchAgent schedule.
+Normal script changes are active after `git pull` because `~/Scripts/mac-maintenance` is a symlink to the repo. Run `mm install` only if you changed installer-managed setup: the app list, LaunchAgent schedule, or `mm` wrapper.
 
 ### iCloud bootstrap
 
@@ -71,6 +71,7 @@ bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-maintenance/scr
 ```
 
 Useful on a new Mac before Git is configured. The installer copies scripts from wherever you run `mac_install.sh` from, so both the repo and the iCloud copy work as a source.
+`mm doctor` still compares bootstrap copies against GitHub, because GitHub remains the canonical source.
 
 ## Usage
 
@@ -112,7 +113,7 @@ The installer installs both the VirusTotal GUI app and `virustotal-cli`. The tri
 
 - Uses a LaunchAgent (user context, no root daemon)
 - Writes logs and last-run status under `~/Library/Logs/mac_maintenance/`
-- Safe to re-run `mm install` at any time
+- Safe to re-run `mm install` at any time, but usually only needed after installer-managed setup changes
 - `mm doctor` can be used to validate the setup and inspect the last recorded run for each script
 
 ## License

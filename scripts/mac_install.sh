@@ -10,8 +10,8 @@
 #     bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-maintenance/scripts/mac_install.sh
 #
 # What this script does:
-#   1. Copies the maintenance repo to:
-#        ~/Repositories/mac-maintenance
+#   1. Copies the maintenance scripts to:
+#        ~/Repositories/mac-maintenance/scripts
 #   2. Creates a symlink:
 #        ~/Scripts/mac-maintenance -> ~/Repositories/mac-maintenance
 #   3. Creates a command wrapper:
@@ -47,10 +47,10 @@ mkdir -p "$BIN_DIR"
 
 echo "── 🚀 Installation started ──"
 
-# ── Copy scripts to repo ─────────────────────────────────
+# ── Copy scripts to install location ─────────────────────
 # Each copy is logged separately so errors are visible.
 # mac_install.sh intentionally copies itself, so 'mm install'
-# always runs the latest version from the repo.
+# always runs the latest installed version.
 
 COPY_OK=true
 for f in mac_common.sh mac_auto.sh mac_manual.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
@@ -180,7 +180,7 @@ summary_print
 
 echo
 echo "── 📁 Installation paths ─────────────────────────"
-log_ok "Repo:    $REPO_ROOT"
+log_ok "Scripts: $TARGET_DIR"
 log_ok "Symlink: $SYMLINK_PATH"
 log_ok "Command: $MM_PATH"
 

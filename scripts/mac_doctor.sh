@@ -129,7 +129,49 @@ if [[ -d "$REPO_ROOT/.git" ]]; then
         check_warn "Repo is a git checkout, but git is not available"
     fi
 else
-    check_ok "Plain install copy detected; GitHub version check skipped"
+    check_ok "Non-git bootstrap copy detected"
+
+    if command -v curl >/dev/null 2>&1; then
+        GITHUB_RAW_BASE="https://raw.githubusercontent.com/tommiec/mac-maintenance/main/scripts"
+        GITHUB_FETCH_FAILED=0
+        GITHUB_MISMATCH_COUNT=0
+
+        if ! TMP_GITHUB_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mac_doctor_github.XXXXXX")"; then
+            check_warn "Could not create temp folder for GitHub version check"
+            TMP_GITHUB_DIR=""
+            GITHUB_FETCH_FAILED=1
+        fi
+
+        if [[ "$GITHUB_FETCH_FAILED" -eq 0 ]]; then
+            for f in mac_common.sh mac_auto.sh mac_manual.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
+                LOCAL_FILE="$REPO_ROOT/scripts/$f"
+                REMOTE_FILE="$TMP_GITHUB_DIR/$f"
+
+                if ! curl -fsSL "$GITHUB_RAW_BASE/$f" -o "$REMOTE_FILE"; then
+                    GITHUB_FETCH_FAILED=1
+                    break
+                fi
+
+                if ! cmp -s "$LOCAL_FILE" "$REMOTE_FILE"; then
+                    GITHUB_MISMATCH_COUNT=$((GITHUB_MISMATCH_COUNT + 1))
+                fi
+            done
+        fi
+
+        if [[ -n "$TMP_GITHUB_DIR" ]]; then
+            rm -rf "$TMP_GITHUB_DIR"
+        fi
+
+        if [[ "$GITHUB_FETCH_FAILED" -eq 1 ]]; then
+            check_warn "Could not compare bootstrap copy with GitHub"
+        elif [[ "$GITHUB_MISMATCH_COUNT" -eq 0 ]]; then
+            check_ok "Installed scripts match GitHub main"
+        else
+            check_warn "$GITHUB_MISMATCH_COUNT installed script(s) differ from GitHub main"
+        fi
+    else
+        check_warn "curl not found; GitHub version check skipped"
+    fi
 fi
 
 # ── LaunchAgent ─────────────────────────────────────────
