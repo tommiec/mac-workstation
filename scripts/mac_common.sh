@@ -5,20 +5,13 @@
 #
 # Do not run directly — sourced by the other scripts.
 #
-# Supported bootstrap models:
+# Setup model:
+#   Source of truth: ~/Repositories/mac-maintenance  (git repo)
+#   Runtime path:    ~/Scripts/mac-maintenance        (symlink to repo)
+#   CLI entrypoint:  ~/Scripts/bin/mm
 #
-# 1. GitHub / repo (recommended)
-#    - Source of truth: ~/Repositories/mac-maintenance
-#    - Runtime path:     ~/Scripts/mac-maintenance -> repo symlink
-#    - CLI entrypoint:   ~/Scripts/bin/mm
-#
-# 2. iCloud Drive (bootstrap / fallback)
-#    - Optional synced copy under:
-#        ~/Library/Mobile Documents/com~apple~CloudDocs/Scripts/mac-maintenance/
-#    - Useful on a new Mac before Git is configured
-#    - Can be refreshed from the repo when needed
-#
-# In normal use, GitHub/repo remains the canonical source.
+# iCloud Drive copy is a personal bootstrap fallback for new Macs.
+# GitHub remains the canonical source.
 # =========================================================
 
 # ── Config ──────────────────────────────────────────────

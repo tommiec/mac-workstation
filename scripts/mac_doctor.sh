@@ -112,7 +112,8 @@ if [[ -d "$REPO_ROOT/.git" ]]; then
         REMOTE_URL="$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || true)"
         if [[ -z "$REMOTE_URL" ]]; then
             check_warn "Git remote 'origin' is not configured"
-        elif GIT_TERMINAL_PROMPT=0 git -C "$REPO_ROOT" fetch --quiet origin main; then
+        elif GIT_TERMINAL_PROMPT=0 git -C "$REPO_ROOT" fetch --quiet origin main 2>/dev/null; then
+            check_ok "Git remote: origin ($REMOTE_URL)"
             LOCAL_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
             REMOTE_SHA="$(git -C "$REPO_ROOT" rev-parse origin/main 2>/dev/null || true)"
 
