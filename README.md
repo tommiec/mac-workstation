@@ -71,7 +71,6 @@ bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-maintenance/scr
 ```
 
 Useful on a new Mac before Git is configured. The installer copies scripts from wherever you run `mac_install.sh` from, so both the repo and the iCloud copy work as a source.
-`mm doctor` still compares bootstrap copies against GitHub, because GitHub remains the canonical source.
 
 ## Usage
 
