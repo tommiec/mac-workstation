@@ -22,7 +22,7 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/mac_common.sh"
 
-RUN_LOG="$LOG_DIR/manual_$(date '+%Y-%m-%d_%H-%M-%S').log"
+RUN_LOG="$LOG_DIR/run_$(date '+%Y-%m-%d_%H-%M-%S').log"
 
 # ── Sudo ─────────────────────────────
 # sudo -v asks for the password once and validates the session.
@@ -45,9 +45,9 @@ trap 'status=$?; kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true; record_script_r
 mkdir -p "$LOG_DIR"
 exec > >(tee -a "$RUN_LOG") 2>&1
 
-notify_user "Mac maintenance started" "Manual maintenance started."
+notify_user "Mac maintenance started" "Run maintenance started."
 
-echo "── 🔍 Manual maintenance ──"
+echo "── 🔍 Run maintenance ──"
 
 # ── Brew doctor ──────────────────────
 # brew doctor exits with 0 on a healthy system, otherwise 1.
@@ -100,6 +100,6 @@ else
     fi
 fi
 
-notify_user "Mac maintenance completed" "Manual maintenance finished."
+notify_user "Mac maintenance completed" "Run maintenance finished."
 
 summary_print

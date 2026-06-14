@@ -88,7 +88,7 @@ case "$1" in
     shift
     "$HOME/Scripts/mac-maintenance/scripts/mac_auto.sh" "$@"
     ;;
-  manual)
+  run)
     shift
     "$HOME/Scripts/mac-maintenance/scripts/mac_run.sh" "$@"
     ;;
