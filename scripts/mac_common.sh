@@ -71,7 +71,6 @@ MANAGED_CASKS=(
   onyx
   rectangle
   utm
-  virtualbox
 
   # Data / modeling
   mysqlworkbench
