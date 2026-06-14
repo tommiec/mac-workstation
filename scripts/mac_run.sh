@@ -40,7 +40,15 @@ while true; do
     kill -0 "$$" || exit
 done 2>/dev/null &
 SUDO_KEEPALIVE_PID=$!
-trap 'status=$?; kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true; record_script_result "mac_run.sh" "$status" "$RUN_LOG"' EXIT
+
+cleanup() {
+    status="$1"
+    kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+    wait "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+    record_script_result "mac_run.sh" "$status" "$RUN_LOG"
+}
+
+trap 'status=$?; cleanup "$status"' EXIT
 
 mkdir -p "$LOG_DIR"
 exec > >(tee -a "$RUN_LOG") 2>&1
