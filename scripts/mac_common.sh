@@ -40,6 +40,7 @@ AUTO_MINUTE=0
 
 MANAGED_CASKS=(
   # Development
+  dash
   github
   gitkraken
   intellij-idea
@@ -47,8 +48,16 @@ MANAGED_CASKS=(
   visual-studio-code
 
   # AI / media
+  chatgpt
+  claude
   lm-studio
+  macwhisper
   vlc
+
+  # Communication / browser
+  discord
+  firefox
+  microsoft-teams
 
   # Security / networking
   balenaetcher
@@ -61,6 +70,7 @@ MANAGED_CASKS=(
   monitorcontrol
   onyx
   rectangle
+  utm
   virtualbox
 
   # Data / modeling
@@ -76,6 +86,7 @@ CLI_TOOLS=(
   gh
   git
   jq
+  mas
   pre-commit
   ripgrep
   shellcheck
