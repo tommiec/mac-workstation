@@ -39,27 +39,89 @@ AUTO_HOUR=2
 AUTO_MINUTE=0
 
 MANAGED_CASKS=(
-  visual-studio-code
+  # Development
+  github
+  gitkraken
   intellij-idea
   postman
-  gitkraken
-  github
-  cyberduck
-  mysqlworkbench
-  visual-paradigm
-  rectangle
+  visual-studio-code
+
+  # AI / media
+  lm-studio
   vlc
-  onyx
+
+  # Security / networking
+  balenaetcher
+  cyberduck
+  malwarebytes
+  wireshark-app
+
+  # System utilities
   appcleaner
   monitorcontrol
+  onyx
+  rectangle
   virtualbox
-  marsanne/cask/virustotal
+
+  # Data / modeling
+  mysqlworkbench
+  visual-paradigm
 )
 
 CLI_TOOLS=(
-  nmap
+  # Development / shell productivity
+  bat
+  fd
+  fzf
+  gh
+  git
+  jq
+  pre-commit
+  ripgrep
+  shellcheck
+  tmux
+  tree
+  yq
+
+  # Python / AI
+  ollama
+  pipx
+  uv
+
+  # DevOps / containers / cloud-native
+  ansible
+  docker
+  docker-compose
+  helm
+  k9s
+  kubectl
+  terraform
+  trivy
+
+  # Security / reverse engineering
+  burp
+  ghidra
+  john-jumbo
+  sqlmap
   virustotal-cli
+
+  # Network / VPN
+  nmap
+  openvpn
+  wget
+  wireshark
+
+  # File / archive / document tools
   dos2unix
+  exiftool
+  p7zip
+  pandoc
+  tesseract
+  tesseract-lang
+  weasyprint
+
+  # Cross-platform administration
+  powershell
 )
 
 # ── Logging ─────────────────────────────────────────────
