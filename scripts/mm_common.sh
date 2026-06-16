@@ -1,13 +1,13 @@
 #!/bin/bash
 # =========================================================
-# mac_common.sh
+# mm_common.sh
 # Shared configuration, paths and helper functions
 #
 # Do not run directly — sourced by the other scripts.
 #
 # Setup model:
-#   Source of truth: ~/Repositories/mac-maintenance  (git repo)
-#   Runtime path:    ~/Scripts/mac-maintenance        (symlink to repo)
+#   Source of truth: ~/Repositories/mac-workstation  (git repo)
+#   Runtime path:    ~/Scripts/mac-workstation        (symlink to repo)
 #   CLI entrypoint:  ~/Scripts/bin/mm
 #
 # iCloud Drive copy is a personal bootstrap fallback for new Macs.
@@ -19,19 +19,21 @@
 # All other scripts source this file and inherit SCRIPTS_DIR.
 
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOG_DIR="$HOME/Library/Logs/mac_maintenance"
+LOG_DIR="$HOME/Library/Logs/mac_manager"
 SCRIPT_STATUS_DIR="$LOG_DIR/status"
-REPO_ROOT="$HOME/Repositories/mac-maintenance"
+REPO_ROOT="$HOME/Repositories/mac-workstation"
 SCRIPTS_ROOT="$HOME/Scripts"
-SYMLINK_PATH="$SCRIPTS_ROOT/mac-maintenance"
+SYMLINK_PATH="$SCRIPTS_ROOT/mac-workstation"
 BIN_DIR="$SCRIPTS_ROOT/bin"
 MM_PATH="$BIN_DIR/mm"
 ICLOUD_SCRIPTS_ROOT="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Scripts"
-ICLOUD_BOOTSTRAP_ROOT="$ICLOUD_SCRIPTS_ROOT/mac-maintenance"
+ICLOUD_BOOTSTRAP_ROOT="$ICLOUD_SCRIPTS_ROOT/mac-workstation"
 ICLOUD_BOOTSTRAP_DIR="$ICLOUD_BOOTSTRAP_ROOT/scripts"
 
-LAUNCH_AGENT_LABEL="local.mac.auto-maintenance"
+LAUNCH_AGENT_LABEL="local.mac-manager.auto-maintenance"
 LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LAUNCH_AGENT_LABEL}.plist"
+LEGACY_LAUNCH_AGENT_LABEL="local.mac.auto-maintenance"
+LEGACY_LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LEGACY_LAUNCH_AGENT_LABEL}.plist"
 
 # launchd: 0=Sunday ... 6=Saturday
 AUTO_WEEKDAY=6
@@ -238,7 +240,7 @@ write_auto_launch_agent() {
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>$SCRIPTS_DIR/mac_auto.sh</string>
+        <string>$SCRIPTS_DIR/mm_auto.sh</string>
     </array>
 
     <key>StartCalendarInterval</key>
@@ -262,6 +264,9 @@ EOF
 
 load_auto_launch_agent() {
     /bin/launchctl bootout "gui/$(id -u)/$LAUNCH_AGENT_LABEL" >/dev/null 2>&1 || true
+    /bin/launchctl bootout "gui/$(id -u)/$LEGACY_LAUNCH_AGENT_LABEL" >/dev/null 2>&1 || true
+    rm -f "$LEGACY_LAUNCH_AGENT_PATH" 2>/dev/null || true
+
     /bin/launchctl bootstrap "gui/$(id -u)" "$LAUNCH_AGENT_PATH" || return 1
 
     if /bin/launchctl print "gui/$(id -u)/$LAUNCH_AGENT_LABEL" >/dev/null 2>&1; then

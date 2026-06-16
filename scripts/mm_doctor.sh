@@ -1,15 +1,15 @@
 #!/bin/bash
 # =========================================================
-# mac_doctor.sh
-# Checks the health of the mac-maintenance setup
+# mm_doctor.sh
+# Checks the health of the mac-workstation setup
 # =========================================================
 
 set -o pipefail
 set -u
 
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPTS_DIR/mac_common.sh"
-trap 'status=$?; record_script_result "mac_doctor.sh" "$status"' EXIT
+source "$SCRIPTS_DIR/mm_common.sh"
+trap 'status=$?; record_script_result "mm_doctor.sh" "$status"' EXIT
 
 OK_COUNT=0
 WARN_COUNT=0
@@ -76,7 +76,7 @@ else
     check_fail "Repo scripts folder missing: $REPO_ROOT/scripts"
 fi
 
-for f in mac_common.sh mac_auto.sh mac_run.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
+for f in mm_common.sh mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh; do
     FILE_PATH="$REPO_ROOT/scripts/$f"
     if [[ -f "$FILE_PATH" ]]; then
         check_ok "$f present"
@@ -130,18 +130,18 @@ else
     check_ok "Non-git bootstrap copy detected"
 
     if command -v curl >/dev/null 2>&1; then
-        GITHUB_RAW_BASE="https://raw.githubusercontent.com/tommiec/mac-maintenance/main/scripts"
+        GITHUB_RAW_BASE="https://raw.githubusercontent.com/tommiec/mac-workstation/main/scripts"
         GITHUB_FETCH_FAILED=0
         GITHUB_MISMATCH_COUNT=0
 
-        if ! TMP_GITHUB_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mac_doctor_github.XXXXXX")"; then
+        if ! TMP_GITHUB_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mm_doctor_github.XXXXXX")"; then
             check_warn "Could not create temp folder for GitHub version check"
             TMP_GITHUB_DIR=""
             GITHUB_FETCH_FAILED=1
         fi
 
         if [[ "$GITHUB_FETCH_FAILED" -eq 0 ]]; then
-            for f in mac_common.sh mac_auto.sh mac_run.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
+            for f in mm_common.sh mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh; do
                 LOCAL_FILE="$REPO_ROOT/scripts/$f"
                 REMOTE_FILE="$TMP_GITHUB_DIR/$f"
 
@@ -187,13 +187,13 @@ else
 fi
 
 if [[ -f "$LAUNCH_AGENT_PATH" ]]; then
-    EXPECTED_REPO="$REPO_ROOT/scripts/mac_auto.sh"
-    EXPECTED_SYMLINK="$SYMLINK_PATH/scripts/mac_auto.sh"
+    EXPECTED_REPO="$REPO_ROOT/scripts/mm_auto.sh"
+    EXPECTED_SYMLINK="$SYMLINK_PATH/scripts/mm_auto.sh"
 
     if grep -Fq "$EXPECTED_REPO" "$LAUNCH_AGENT_PATH" || grep -Fq "$EXPECTED_SYMLINK" "$LAUNCH_AGENT_PATH"; then
-        check_ok "LaunchAgent points to the expected mac_auto.sh"
+        check_ok "LaunchAgent points to the expected mm_auto.sh"
     else
-        check_fail "LaunchAgent does not point to the expected mac_auto.sh"
+        check_fail "LaunchAgent does not point to the expected mm_auto.sh"
     fi
 fi
 
@@ -248,7 +248,7 @@ fi
 
 echo
 echo "── 🧾 Last script runs ───────────────────────────"
-for script in mac_auto.sh mac_run.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
+for script in mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh; do
     STATUS_FILE="$SCRIPT_STATUS_DIR/$script.status"
 
     if [[ ! -f "$STATUS_FILE" ]]; then

@@ -1,12 +1,12 @@
 #!/bin/bash
 # =========================================================
-# mac_run.sh
+# mm_maintain.sh
 # Run maintenance now: Homebrew, DNS flush, macOS updates
 #
 # Usage (after installation):
-#   mm run
+#   mm maintain
 #   or
-#   bash ~/Scripts/mac-maintenance/scripts/mac_run.sh
+#   bash ~/Scripts/mac-workstation/scripts/mm_maintain.sh
 #
 # What this script does:
 #   - Runs brew doctor
@@ -20,9 +20,9 @@ set -o pipefail
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/mac_common.sh"
+source "$SCRIPT_DIR/mm_common.sh"
 
-RUN_LOG="$LOG_DIR/run_$(date '+%Y-%m-%d_%H-%M-%S').log"
+RUN_LOG="$LOG_DIR/maintain_$(date '+%Y-%m-%d_%H-%M-%S').log"
 
 # ── Sudo ─────────────────────────────
 # sudo -v asks for the password once and validates the session.
@@ -45,7 +45,7 @@ cleanup() {
     status="$1"
     kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
     wait "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
-    record_script_result "mac_run.sh" "$status" "$RUN_LOG"
+    record_script_result "mm_maintain.sh" "$status" "$RUN_LOG"
 }
 
 trap 'status=$?; cleanup "$status"' EXIT
@@ -53,9 +53,9 @@ trap 'status=$?; cleanup "$status"' EXIT
 mkdir -p "$LOG_DIR"
 exec > >(tee -a "$RUN_LOG") 2>&1
 
-notify_user "Mac maintenance started" "Run maintenance started."
+notify_user "Mac Manager started" "Maintenance run started."
 
-echo "── 🔍 Run maintenance ──"
+echo "── 🔍 Mac Manager maintenance ──"
 
 # ── Brew doctor ──────────────────────
 # brew doctor exits with 0 on a healthy system, otherwise 1.
@@ -108,6 +108,6 @@ else
     fi
 fi
 
-notify_user "Mac maintenance completed" "Run maintenance finished."
+notify_user "Mac Manager completed" "Maintenance run finished."
 
 summary_print

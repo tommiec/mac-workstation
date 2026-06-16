@@ -1,6 +1,6 @@
 #!/bin/bash
 # =========================================================
-# mac_triage.sh
+# mm_triage.sh
 # Snelle static file/malware triage voor:
 #
 #   mm triage <file>
@@ -13,7 +13,7 @@ set -o pipefail
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/mac_common.sh"
+source "$SCRIPT_DIR/mm_common.sh"
 
 TMP_DIR=""
 
@@ -22,7 +22,7 @@ cleanup() {
     if [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ]; then
         rm -rf "$TMP_DIR"
     fi
-    record_script_result "mac_triage.sh" "$status"
+    record_script_result "mm_triage.sh" "$status"
 }
 
 trap 'status=$?; cleanup "$status"' EXIT
@@ -107,7 +107,7 @@ is_xlsx=0
 is_pptx=0
 is_jar=0
 
-TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mac_triage.XXXXXX")" || {
+TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mm_triage.XXXXXX")" || {
     echo "❌ Could not create temporary directory."
     exit 1
 }

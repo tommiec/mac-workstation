@@ -1,10 +1,10 @@
 #!/bin/bash
 # =========================================================
-# mac_auto.sh
+# mm_auto.sh
 # Weekly automated maintenance (launchd)
 #
 # Do not run directly — runs automatically through
-# launchd (registered by mac_install.sh).
+# launchd (registered by mm_install.sh).
 # Schedule: every Saturday at 02:00
 #
 # What this script does:
@@ -18,14 +18,14 @@ set -o pipefail
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/mac_common.sh"
+source "$SCRIPT_DIR/mm_common.sh"
 
 mkdir -p "$LOG_DIR"
 RUN_LOG="$LOG_DIR/auto_$(date '+%Y-%m-%d_%H-%M-%S').log"
 exec > >(tee -a "$RUN_LOG") 2>&1
-trap 'status=$?; record_script_result "mac_auto.sh" "$status" "$RUN_LOG"' EXIT
+trap 'status=$?; record_script_result "mm_auto.sh" "$status" "$RUN_LOG"' EXIT
 
-notify_user "Mac maintenance started" "Automated maintenance started."
+notify_user "Mac Manager started" "Automated maintenance started."
 
 echo "── ⚡ Auto maintenance ──"
 
@@ -53,7 +53,7 @@ else
 fi
 
 # ── macOS updates ────────────────────
-# Detect and report only; installation happens through 'mm run'.
+# Detect and report only; installation happens through 'mm maintain'.
 # softwareupdate --list writes to stderr; 2>&1 captures it.
 # grep -c exits with 1 for 0 matches; || true handles that.
 
@@ -65,7 +65,7 @@ if [[ "$COUNT" -eq 0 ]]; then
     log_ok "No macOS updates available"
 else
     log_warn "$COUNT macOS update(s) available"
-    notify_user "macOS updates available" "Use 'mm run' to install them."
+    notify_user "macOS updates available" "Use 'mm maintain' to install them."
 fi
 
 # ── Cache cleanup ────────────────────
@@ -84,6 +84,6 @@ DELETED=$(
 )
 log_ok "$DELETED old cache file(s) deleted"
 
-notify_user "Mac maintenance completed" "Maintenance finished."
+notify_user "Mac Manager completed" "Maintenance finished."
 
 summary_print

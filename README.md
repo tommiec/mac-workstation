@@ -1,35 +1,37 @@
-# mac-maintenance
+# mac-workstation
 
-My personal macOS maintenance scripts using Homebrew and launchd.
+My personal macOS workstation setup: Homebrew tooling, scheduled maintenance, diagnostics, and file/security triage.
 
 ## Why this exists
 
-A consistent, low-effort way to keep my Mac up to date — without forgetting updates, letting Homebrew drift, or doing cleanup ad hoc.
+A consistent, low-effort way to bootstrap my Mac, keep core tooling maintained, and support day-to-day IT, DevOps, AI, and security work.
 
 One-time setup. Runs automatically. Manual control when needed.
 
-> **Using this yourself?** The app list in `mac_common.sh` (`MANAGED_CASKS`, `CLI_TOOLS`) is mine. Fork the repo and replace those lists with your own before running the installer.
+> **Using this yourself?** The app list in `mm_common.sh` (`MANAGED_CASKS`, `CLI_TOOLS`) is mine. Fork the repo and replace those lists with your own before running the installer.
+>
+> `mm` stands for **Mac Manager**.
 
 ## Scripts
 
 | Script | Purpose |
 |---|---|
-| `mac_install.sh` | Bootstrap setup (repo, symlink, CLI, launchd) |
-| `mac_auto.sh` | Automated weekly maintenance (launchd) |
-| `mac_run.sh` | Run maintenance now: Homebrew, DNS flush, macOS updates |
-| `mac_doctor.sh` | Health checks and diagnostics (`mm doctor`) |
-| `mac_triage.sh` | Quick file/malware triage with hash, VirusTotal and strings (`mm triage`) |
-| `mac_common.sh` | Shared configuration and helpers (app list lives here) |
+| `mm_install.sh` | Bootstrap setup (repo, symlink, CLI, launchd) |
+| `mm_auto.sh` | Automated weekly maintenance (launchd) |
+| `mm_maintain.sh` | Run maintenance now: Homebrew, DNS flush, macOS updates |
+| `mm_doctor.sh` | Health checks and diagnostics (`mm doctor`) |
+| `mm_triage.sh` | Quick file/malware triage with hash, VirusTotal and strings (`mm triage`) |
+| `mm_common.sh` | Shared configuration and helpers (app list lives here) |
 
 ## How it works
 
 Scripts are managed using a **repo + symlink + CLI model**:
 
 ```
-~/Repositories/mac-maintenance          → source of truth (git repo)
-~/Scripts/mac-maintenance               → symlink to repo
+~/Repositories/mac-workstation          → source of truth (git repo)
+~/Scripts/mac-workstation               → symlink to repo
 ~/Scripts/bin/mm                        → CLI entrypoint
-~/Library/Logs/mac_maintenance/         → logs
+~/Library/Logs/mac_manager/             → logs
 ```
 
 - The repo contains all scripts and is version-controlled
@@ -42,49 +44,49 @@ Scripts are managed using a **repo + symlink + CLI model**:
 Clone the repo and run the installer once:
 
 ```bash
-git clone https://github.com/tommiec/mac-maintenance.git ~/Repositories/mac-maintenance
-bash ~/Repositories/mac-maintenance/scripts/mac_install.sh
+git clone https://github.com/tommiec/mac-workstation.git ~/Repositories/mac-workstation
+bash ~/Repositories/mac-workstation/scripts/mm_install.sh
 ```
 
 The installer will:
 - set up Homebrew (if needed)
-- install all apps from `MANAGED_CASKS` and `CLI_TOOLS` in `mac_common.sh`
-- create the symlink under `~/Scripts/mac-maintenance`
+- install all apps from `MANAGED_CASKS` and `CLI_TOOLS` in `mm_common.sh`
+- create the symlink under `~/Scripts/mac-workstation`
 - install the `mm` command in `~/Scripts/bin`
 - register the weekly launchd job
 
 To update later:
 
 ```bash
-cd ~/Repositories/mac-maintenance
+cd ~/Repositories/mac-workstation
 git pull --ff-only
 ```
 
-Normal script changes are active after `git pull` because `~/Scripts/mac-maintenance` is a symlink to the repo. Run `mm install` only if you changed installer-managed setup: the app list, LaunchAgent schedule, or `mm` wrapper.
+Normal script changes are active after `git pull` because `~/Scripts/mac-workstation` is a symlink to the repo. Run `mm install` only if you changed installer-managed setup: the app list, LaunchAgent schedule, or `mm` wrapper.
 
 ### iCloud bootstrap
 
 If you already have a synced copy in iCloud Drive (my personal fallback), you can run the installer from there instead:
 
 ```bash
-bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-maintenance/scripts/mac_install.sh
+bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-workstation/scripts/mm_install.sh
 ```
 
-Useful on a new Mac before Git is configured. The installer copies scripts from wherever you run `mac_install.sh` from, so both the repo and the iCloud copy work as a source.
+Useful on a new Mac before Git is configured. The installer copies scripts from wherever you run `mm_install.sh` from, so both the repo and the iCloud copy work as a source.
 
 ## Usage
 
 **Automatic** — runs every Saturday at 02:00 via launchd.
 
-**Manual commands:**
+**Commands:**
 
 ```bash
-mm auto     # run automated maintenance now
-mm run      # run maintenance now
-mm install  # re-run setup
-mm doctor   # check system health
+mm auto      # run automated maintenance now
+mm maintain  # run maintenance now
+mm install   # re-run setup
+mm doctor    # check system health
 mm triage <file>  # inspect a suspicious file
-mm help     # show available commands
+mm help      # show available commands
 ```
 
 ## File triage
@@ -106,12 +108,12 @@ The command:
 - prints a simple triage score
 - opens extracted strings in `less` for manual review
 
-The installer installs both the VirusTotal GUI app and `virustotal-cli`. The triage script uses the CLI command `vt` for lookups, so configure the `vt` CLI with your VirusTotal API key first. The string view opens in `less`; press `q` to exit it.
+The installer installs `virustotal-cli`. The triage script uses the CLI command `vt` for lookups, so configure the `vt` CLI with your VirusTotal API key first. The string view opens in `less`; press `q` to exit it.
 
 ## Notes
 
 - Uses a LaunchAgent (user context, no root daemon)
-- Writes logs and last-run status under `~/Library/Logs/mac_maintenance/`
+- Writes logs and last-run status under `~/Library/Logs/mac_manager/`
 - Safe to re-run `mm install` at any time, but usually only needed after installer-managed setup changes
 - `mm doctor` can be used to validate the setup and inspect the last recorded run for each script
 

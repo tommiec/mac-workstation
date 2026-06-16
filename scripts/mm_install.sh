@@ -1,29 +1,29 @@
 #!/bin/bash
 # =========================================================
-# mac_install.sh
-# Bootstrap setup script — installs apps and configures automation
+# mm_install.sh
+# Bootstrap setup script — installs apps and configures Mac Manager automation
 #
 # Usage (once on a new Mac):
 #   GitHub:
-#     bash ~/Repositories/mac-maintenance/scripts/mac_install.sh
+#     bash ~/Repositories/mac-workstation/scripts/mm_install.sh
 #   iCloud Drive:
-#     bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-maintenance/scripts/mac_install.sh
+#     bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-workstation/scripts/mm_install.sh
 #
 # What this script does:
-#   1. Copies the maintenance scripts to:
-#        ~/Repositories/mac-maintenance/scripts
+#   1. Copies the Mac Manager scripts to:
+#        ~/Repositories/mac-workstation/scripts
 #   2. Creates a symlink:
-#        ~/Scripts/mac-maintenance -> ~/Repositories/mac-maintenance
+#        ~/Scripts/mac-workstation -> ~/Repositories/mac-workstation
 #   3. Creates a command wrapper:
 #        ~/Scripts/bin/mm
 #   4. Installs Homebrew if needed
 #   5. Installs all apps from MANAGED_CASKS and CLI_TOOLS
-#   6. Registers mac_auto.sh as a weekly launchd agent
+#   6. Registers mm_auto.sh as a weekly launchd agent
 #        (every Saturday at 02:00)
 #
 # After installation:
 #   mm auto
-#   mm run
+#   mm maintain
 #   mm install
 #   mm doctor
 # =========================================================
@@ -34,10 +34,11 @@ set -u
 # SRC_DIR = location of this script (for example iCloud Drive on first run)
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-REPO_ROOT="$HOME/Repositories/mac-maintenance"
+REPO_ROOT="$HOME/Repositories/mac-workstation"
 TARGET_DIR="$REPO_ROOT/scripts"
 SCRIPTS_ROOT="$HOME/Scripts"
-SYMLINK_PATH="$SCRIPTS_ROOT/mac-maintenance"
+SYMLINK_PATH="$SCRIPTS_ROOT/mac-workstation"
+LEGACY_SYMLINK_PATH="$SCRIPTS_ROOT/mac-maintenance"
 BIN_DIR="$SCRIPTS_ROOT/bin"
 MM_PATH="$BIN_DIR/mm"
 
@@ -49,11 +50,11 @@ echo "── 🚀 Installation started ──"
 
 # ── Copy scripts to install location ─────────────────────
 # Each copy is logged separately so errors are visible.
-# mac_install.sh intentionally copies itself, so 'mm install'
+# mm_install.sh intentionally copies itself, so 'mm install'
 # always runs the latest installed version.
 
 COPY_OK=true
-for f in mac_common.sh mac_auto.sh mac_run.sh mac_install.sh mac_doctor.sh mac_triage.sh; do
+for f in mm_common.sh mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh; do
     SRC="$SRC_DIR/$f"
     DST="$TARGET_DIR/$f"
 
@@ -74,7 +75,11 @@ fi
 
 chmod +x "$TARGET_DIR"/*.sh
 
-# ── Symlink to ~/Scripts/mac-maintenance ─────────────────
+# ── Symlink to ~/Scripts/mac-workstation ─────────────────
+
+if [[ -L "$LEGACY_SYMLINK_PATH" ]]; then
+    rm -f "$LEGACY_SYMLINK_PATH"
+fi
 
 ln -sfn "$REPO_ROOT" "$SYMLINK_PATH"
 
@@ -86,31 +91,31 @@ cat > "$MM_PATH" <<'EOF'
 case "$1" in
   auto)
     shift
-    "$HOME/Scripts/mac-maintenance/scripts/mac_auto.sh" "$@"
+    "$HOME/Scripts/mac-workstation/scripts/mm_auto.sh" "$@"
     ;;
-  run)
+  maintain)
     shift
-    "$HOME/Scripts/mac-maintenance/scripts/mac_run.sh" "$@"
+    "$HOME/Scripts/mac-workstation/scripts/mm_maintain.sh" "$@"
     ;;
   install)
     shift
-    "$HOME/Scripts/mac-maintenance/scripts/mac_install.sh" "$@"
+    "$HOME/Scripts/mac-workstation/scripts/mm_install.sh" "$@"
     ;;
   doctor)
     shift
-    "$HOME/Scripts/mac-maintenance/scripts/mac_doctor.sh" "$@"
+    "$HOME/Scripts/mac-workstation/scripts/mm_doctor.sh" "$@"
     ;;
   triage)
     shift
-    "$HOME/Scripts/mac-maintenance/scripts/mac_triage.sh" "$@"
+    "$HOME/Scripts/mac-workstation/scripts/mm_triage.sh" "$@"
     ;;
   help|"")
     echo "Usage:"
-    echo "  mm auto     # automated maintenance"
-    echo "  mm run      # run maintenance now"
-    echo "  mm install  # run setup"
-    echo "  mm doctor   # check setup health"
-    echo "  mm triage   # quick file/malware triage"
+    echo "  mm auto      # automated maintenance"
+    echo "  mm maintain  # run maintenance now"
+    echo "  mm install   # run setup"
+    echo "  mm doctor    # check setup health"
+    echo "  mm triage    # quick file/malware triage"
     ;;
   *)
     echo "Unknown command: $1"
@@ -124,11 +129,11 @@ chmod +x "$MM_PATH"
 
 # ── Load shared functions and config ─────────────────────
 # From here on, everything runs from the repo location (TARGET_DIR).
-# SCRIPTS_DIR in mac_common.sh then points to TARGET_DIR correctly.
+# SCRIPTS_DIR in mm_common.sh then points to TARGET_DIR correctly.
 
-source "$TARGET_DIR/mac_common.sh"
+source "$TARGET_DIR/mm_common.sh"
 mkdir -p "$LOG_DIR"
-trap 'status=$?; record_script_result "mac_install.sh" "$status"' EXIT
+trap 'status=$?; record_script_result "mm_install.sh" "$status"' EXIT
 
 # ── Homebrew ─────────────────────────
 
