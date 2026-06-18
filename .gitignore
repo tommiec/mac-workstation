@@ -4,7 +4,5 @@
 # Logs
 *.log
 
-# runtime (nooit committen)
-~/Library/Application Support/mac-maintenance/
-~/Library/Logs/mac_maintenance/
-EOF
+# Runtime
+Library/Logs/mac_manager/

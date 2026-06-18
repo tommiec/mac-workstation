@@ -112,28 +112,25 @@ The installer installs `virustotal-cli`. The triage script uses the CLI command 
 
 ## Secrets & SSH keys
 
-API keys and tokens should never be stored as plain text in dotfiles. The recommended approach on macOS is to use the system Keychain as the single source of truth — iCloud Keychain then provides automatic encrypted backup across your Apple devices.
+Avoid storing API keys and tokens as plain text in dotfiles. On macOS, Keychain or Apple Passwords is a better place for them.
 
-`mm_common.sh` exposes two helpers for this:
-
-```bash
-keychain_set "ANTHROPIC_API_KEY" "sk-ant-..."   # store once
-keychain_get "ANTHROPIC_API_KEY"                 # retrieve
-```
-
-In `~/.zshrc`, load the key at shell startup instead of hardcoding it:
+For one-off Keychain use, source the helper file first:
 
 ```bash
-export ANTHROPIC_API_KEY="$(keychain_get ANTHROPIC_API_KEY 2>/dev/null)"
+source ~/Scripts/mac-workstation/scripts/mm_common.sh
+keychain_set "ANTHROPIC_API_KEY"   # store once; prompts for the secret
+keychain_get "ANTHROPIC_API_KEY"   # retrieve
 ```
 
-`mm doctor` checks for violations:
+In `~/.zshrc`, load the key directly from Keychain instead of hardcoding it:
 
-- **Plain-text secrets in dotfiles** — scans `~/.zshrc`, `~/.zprofile`, `~/.bashrc`, `~/.bash_profile`, and `~/.profile` for variable assignments whose names contain `KEY`, `TOKEN`, `SECRET`, or `PASSWORD` and whose value appears to be a literal string (not a `$(...)` or `${...}` expression). Values are masked in the output.
-- **SSH private key permissions** — all private keys in `~/.ssh` (excluding `.pub`, `known_hosts`, `config`, and `authorized_keys`) must have permissions `600`. Warns with the exact `chmod` command if not.
-- **`~/.ssh` directory permissions** — the folder itself should be `700`.
+```bash
+export ANTHROPIC_API_KEY="$(security find-generic-password -a "$USER" -s ANTHROPIC_API_KEY -w 2>/dev/null)"
+```
 
-SSH private keys should always be protected with a passphrase. macOS stores the passphrase in Keychain automatically when you first use the key, so you only type it once.
+`mm doctor` warns about likely plain-text secrets in shell dotfiles, loose `~/.ssh` permissions, and SSH private keys that are not `600`. Secret values are masked in the output.
+
+Use passphrases for SSH private keys. macOS can remember those passphrases in Keychain.
 
 ## Notes
 

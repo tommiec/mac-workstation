@@ -214,20 +214,32 @@ notify_user() {
 }
 
 # ── Keychain helpers ────────────────────────────────────
-# Usage:
+# Usage after sourcing this file:
 #   keychain_get "ANTHROPIC_API_KEY"
-#   keychain_set "ANTHROPIC_API_KEY" "sk-ant-..."
+#   keychain_set "ANTHROPIC_API_KEY"
 #
 # In ~/.zshrc, load a key without storing it as plain text:
-#   export ANTHROPIC_API_KEY="$(keychain_get ANTHROPIC_API_KEY 2>/dev/null)"
+#   export ANTHROPIC_API_KEY="$(security find-generic-password -a "$USER" -s ANTHROPIC_API_KEY -w 2>/dev/null)"
 
 keychain_get() {
     security find-generic-password -a "$USER" -s "$1" -w 2>/dev/null
 }
 
 keychain_set() {
+    local service="${1:-}"
+    local secret=""
+
+    if [[ "$#" -ne 1 || -z "$service" ]]; then
+        echo "Usage: keychain_set SERVICE_NAME" >&2
+        return 2
+    fi
+
+    printf "Secret for %s: " "$service" >&2
+    IFS= read -r -s secret
+    printf "\n" >&2
+
     # -U updates an existing entry if present
-    security add-generic-password -U -a "$USER" -s "$1" -w "$2"
+    security add-generic-password -U -a "$USER" -s "$service" -w "$secret"
 }
 
 # ── Homebrew ────────────────────────────────────────────
