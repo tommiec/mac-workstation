@@ -213,6 +213,23 @@ notify_user() {
         -e "display notification \"${message//\"/\\\"}\" with title \"${title//\"/\\\"}\""
 }
 
+# ── Keychain helpers ────────────────────────────────────
+# Usage:
+#   keychain_get "ANTHROPIC_API_KEY"
+#   keychain_set "ANTHROPIC_API_KEY" "sk-ant-..."
+#
+# In ~/.zshrc, load a key without storing it as plain text:
+#   export ANTHROPIC_API_KEY="$(keychain_get ANTHROPIC_API_KEY 2>/dev/null)"
+
+keychain_get() {
+    security find-generic-password -a "$USER" -s "$1" -w 2>/dev/null
+}
+
+keychain_set() {
+    # -U updates an existing entry if present
+    security add-generic-password -U -a "$USER" -s "$1" -w "$2"
+}
+
 # ── Homebrew ────────────────────────────────────────────
 
 ensure_brew() {

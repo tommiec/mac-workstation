@@ -9,7 +9,7 @@ set -u
 
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPTS_DIR/mm_common.sh"
-trap 'status=$?; record_script_result "mm_doctor.sh" "$status"' EXIT
+trap 'record_script_result "mm_doctor.sh" "$?"' EXIT
 
 OK_COUNT=0
 WARN_COUNT=0
@@ -39,6 +39,7 @@ if echo "$PATH" | tr ':' '\n' | grep -Fxq "$HOME/Scripts/bin"; then
     check_ok "PATH contains ~/Scripts/bin"
 else
     check_fail "PATH does not contain ~/Scripts/bin"
+    # shellcheck disable=SC2016
     echo '   Add this to ~/.zshrc: export PATH="$HOME/Scripts/bin:$PATH"'
 fi
 
@@ -217,6 +218,72 @@ if command -v brew >/dev/null 2>&1; then
     fi
 else
     check_fail "Homebrew not found"
+fi
+
+# ── Secrets & SSH ───────────────────────────────────────
+# Goal: nothing sensitive should live as plain text in dotfiles.
+# API keys should come from a password manager, Keychain helper, or another
+# command substitution instead of being written directly in shell files.
+
+echo
+echo "── 🔑 Secrets & SSH ──────────────────────────────"
+
+DOTFILES_TO_SCAN=(
+    "$HOME/.zshrc"
+    "$HOME/.zprofile"
+    "$HOME/.bashrc"
+    "$HOME/.bash_profile"
+    "$HOME/.profile"
+)
+PLAIN_SECRET_FOUND=0
+
+for dotfile in "${DOTFILES_TO_SCAN[@]}"; do
+    [[ -f "$dotfile" ]] || continue
+
+    # Find likely secret assignments where the value looks literal. Dynamic
+    # values loaded through command/variable expansion are intentionally OK.
+    MATCHES="$(grep -nE '^[[:space:]]*(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*(API_?KEY|KEY|TOKEN|SECRET|PASSWORD|PRIVATE_?KEY)[A-Za-z0-9_]*[[:space:]]*=' \
+        "$dotfile" 2>/dev/null | grep -vE '=[[:space:]]*([$`]|""|'\'''\''|$)' || true)"
+
+    if [[ -n "$MATCHES" ]]; then
+        check_warn "Possible plain-text secret in $(basename "$dotfile"); move it to Keychain or your password manager:"
+        while IFS= read -r line; do
+            # Mask values so secrets never appear in doctor output or logs.
+            echo "      ${line%%=*}=<hidden>"
+        done <<< "$MATCHES"
+        PLAIN_SECRET_FOUND=1
+    fi
+done
+
+if [[ "$PLAIN_SECRET_FOUND" -eq 0 ]]; then
+    check_ok "No plain-text secrets detected in dotfiles"
+fi
+
+# SSH private key permissions
+if [[ -d "$HOME/.ssh" ]]; then
+    check_ok "$HOME/.ssh folder exists"
+
+    SSH_DIR_PERMS="$(stat -f "%A" "$HOME/.ssh" 2>/dev/null || true)"
+    if [[ -n "$SSH_DIR_PERMS" && "$SSH_DIR_PERMS" != "700" ]]; then
+        check_warn "$HOME/.ssh has permissions $SSH_DIR_PERMS; recommended: chmod 700 \"$HOME/.ssh\""
+    fi
+
+    BAD_SSH_PERMS=0
+    while IFS= read -r keyfile; do
+        perms="$(stat -f "%A" "$keyfile" 2>/dev/null || true)"
+        if [[ "$perms" != "600" ]]; then
+            check_warn "SSH private key has wrong permissions ($perms): $(basename "$keyfile") — fix: chmod 600 \"$keyfile\""
+            BAD_SSH_PERMS=1
+        fi
+    done < <(find "$HOME/.ssh" -maxdepth 1 -type f \
+        ! -name "*.pub" ! -name "known_hosts" ! -name "known_hosts.old" \
+        ! -name "config" ! -name "authorized_keys" 2>/dev/null)
+
+    if [[ "$BAD_SSH_PERMS" -eq 0 ]]; then
+        check_ok "SSH private key permissions OK (600)"
+    fi
+else
+    check_warn "$HOME/.ssh folder not found"
 fi
 
 # ── Logs ────────────────────────────────────────────────

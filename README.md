@@ -110,6 +110,31 @@ The command:
 
 The installer installs `virustotal-cli`. The triage script uses the CLI command `vt` for lookups, so configure the `vt` CLI with your VirusTotal API key first. The string view opens in `less`; press `q` to exit it.
 
+## Secrets & SSH keys
+
+API keys and tokens should never be stored as plain text in dotfiles. The recommended approach on macOS is to use the system Keychain as the single source of truth — iCloud Keychain then provides automatic encrypted backup across your Apple devices.
+
+`mm_common.sh` exposes two helpers for this:
+
+```bash
+keychain_set "ANTHROPIC_API_KEY" "sk-ant-..."   # store once
+keychain_get "ANTHROPIC_API_KEY"                 # retrieve
+```
+
+In `~/.zshrc`, load the key at shell startup instead of hardcoding it:
+
+```bash
+export ANTHROPIC_API_KEY="$(keychain_get ANTHROPIC_API_KEY 2>/dev/null)"
+```
+
+`mm doctor` checks for violations:
+
+- **Plain-text secrets in dotfiles** — scans `~/.zshrc`, `~/.zprofile`, `~/.bashrc`, `~/.bash_profile`, and `~/.profile` for variable assignments whose names contain `KEY`, `TOKEN`, `SECRET`, or `PASSWORD` and whose value appears to be a literal string (not a `$(...)` or `${...}` expression). Values are masked in the output.
+- **SSH private key permissions** — all private keys in `~/.ssh` (excluding `.pub`, `known_hosts`, `config`, and `authorized_keys`) must have permissions `600`. Warns with the exact `chmod` command if not.
+- **`~/.ssh` directory permissions** — the folder itself should be `700`.
+
+SSH private keys should always be protected with a passphrase. macOS stores the passphrase in Keychain automatically when you first use the key, so you only type it once.
+
 ## Notes
 
 - Uses a LaunchAgent (user context, no root daemon)
