@@ -22,6 +22,7 @@ SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="$HOME/Library/Logs/mac_manager"
 SCRIPT_STATUS_DIR="$LOG_DIR/status"
 REPO_ROOT="$HOME/Repositories/mac-workstation"
+CONFIGS_DIR="$REPO_ROOT/configs"
 SCRIPTS_ROOT="$HOME/Scripts"
 SYMLINK_PATH="$SCRIPTS_ROOT/mac-workstation"
 BIN_DIR="$SCRIPTS_ROOT/bin"
@@ -240,6 +241,25 @@ keychain_set() {
 
     # -U updates an existing entry if present
     security add-generic-password -U -a "$USER" -s "$service" -w "$secret"
+}
+
+# ── Git global configuration ────────────────────────────
+# Installs configs/git-ignore-global as ~/.config/git/ignore and sets
+# core.excludesFile so all repos on this machine inherit the exclude rules.
+
+setup_git_global() {
+    local git_config_dir="$HOME/.config/git"
+    local src="$CONFIGS_DIR/git-ignore-global"
+    local dst="$git_config_dir/ignore"
+
+    if [[ ! -f "$src" ]]; then
+        echo "configs/git-ignore-global not found" >&2
+        return 1
+    fi
+
+    mkdir -p "$git_config_dir"
+    cp "$src" "$dst" || return 1
+    git config --global core.excludesFile "$dst" || return 1
 }
 
 # ── Homebrew ────────────────────────────────────────────

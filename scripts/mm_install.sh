@@ -146,6 +146,10 @@ fi
 
 run_step "brew update" brew update
 
+# ── Git global configuration ─────────
+
+run_step "git global exclude setup" setup_git_global
+
 # ── Install apps ─────────────────────
 
 for pkg in "${MANAGED_CASKS[@]}"; do

@@ -1,0 +1,45 @@
+# Local tool settings — never commit
+**/.claude/settings.local.json
+
+# AI agent/assistant files — never commit
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+COPILOT.md
+
+# Cursor IDE
+.cursor/
+.cursorignore
+.cursorrules
+
+# Aider
+.aider*
+
+# Continue.dev
+.continue/
+
+# Roo Code
+.roo/
+
+# Windsurf
+.windsurf/
+
+# OpenAI Codex
+.codex/
+
+# OpenHands
+.openhands/
+
+# Cline
+.clineresults
+
+# Generic AI/prompt dirs
+.ai/
+.ai-context/
+.llm/
+.llms/
+.instructions/
+.prompts/
+
+# GitHub Copilot
+.github/copilot-instructions.md
