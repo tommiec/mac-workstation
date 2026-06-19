@@ -5,15 +5,15 @@
 #
 # Usage (once on a new Mac):
 #   GitHub:
-#     bash ~/Repositories/mac-workstation/scripts/mm_install.sh
+#     bash ~/Repositories/dev/mac-workstation/scripts/mm_install.sh
 #   iCloud Drive:
 #     bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-workstation/scripts/mm_install.sh
 #
 # What this script does:
 #   1. Copies the Mac Manager scripts to:
-#        ~/Repositories/mac-workstation/scripts
+#        ~/Repositories/dev/mac-workstation/scripts
 #   2. Creates a symlink:
-#        ~/Scripts/mac-workstation -> ~/Repositories/mac-workstation
+#        ~/Scripts/mac-workstation -> ~/Repositories/dev/mac-workstation
 #   3. Creates a command wrapper:
 #        ~/Scripts/bin/mm
 #   4. Installs Homebrew if needed
@@ -34,7 +34,7 @@ set -u
 # SRC_DIR = location of this script (for example iCloud Drive on first run)
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-REPO_ROOT="$HOME/Repositories/mac-workstation"
+REPO_ROOT="$HOME/Repositories/dev/mac-workstation"
 TARGET_DIR="$REPO_ROOT/scripts"
 SCRIPTS_ROOT="$HOME/Scripts"
 SYMLINK_PATH="$SCRIPTS_ROOT/mac-workstation"

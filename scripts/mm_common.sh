@@ -6,8 +6,8 @@
 # Do not run directly — sourced by the other scripts.
 #
 # Setup model:
-#   Source of truth: ~/Repositories/mac-workstation  (git repo)
-#   Runtime path:    ~/Scripts/mac-workstation        (symlink to repo)
+#   Source of truth: ~/Repositories/dev/mac-workstation  (git repo)
+#   Runtime path:    ~/Scripts/mac-workstation            (symlink to repo)
 #   CLI entrypoint:  ~/Scripts/bin/mm
 #
 # iCloud Drive copy is a personal bootstrap fallback for new Macs.
@@ -21,7 +21,7 @@
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="$HOME/Library/Logs/mac_manager"
 SCRIPT_STATUS_DIR="$LOG_DIR/status"
-REPO_ROOT="$HOME/Repositories/mac-workstation"
+REPO_ROOT="$HOME/Repositories/dev/mac-workstation"
 CONFIGS_DIR="$REPO_ROOT/configs"
 SCRIPTS_ROOT="$HOME/Scripts"
 SYMLINK_PATH="$SCRIPTS_ROOT/mac-workstation"

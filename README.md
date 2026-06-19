@@ -28,7 +28,7 @@ One-time setup. Runs automatically. Manual control when needed.
 Scripts are managed using a **repo + symlink + CLI model**:
 
 ```
-~/Repositories/mac-workstation          → source of truth (git repo)
+~/Repositories/dev/mac-workstation          → source of truth (git repo)
 ~/Scripts/mac-workstation               → symlink to repo
 ~/Scripts/bin/mm                        → CLI entrypoint
 ~/Library/Logs/mac_manager/             → logs
@@ -44,8 +44,8 @@ Scripts are managed using a **repo + symlink + CLI model**:
 Clone the repo and run the installer once:
 
 ```bash
-git clone https://github.com/tommiec/mac-workstation.git ~/Repositories/mac-workstation
-bash ~/Repositories/mac-workstation/scripts/mm_install.sh
+git clone https://github.com/tommiec/mac-workstation.git ~/Repositories/dev/mac-workstation
+bash ~/Repositories/dev/mac-workstation/scripts/mm_install.sh
 ```
 
 The installer will:
@@ -58,7 +58,7 @@ The installer will:
 To update later:
 
 ```bash
-cd ~/Repositories/mac-workstation
+cd ~/Repositories/dev/mac-workstation
 git pull --ff-only
 ```
 
