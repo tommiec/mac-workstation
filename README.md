@@ -128,7 +128,7 @@ In `~/.zshrc`, load the key directly from Keychain instead of hardcoding it:
 export ANTHROPIC_API_KEY="$(security find-generic-password -a "$USER" -s ANTHROPIC_API_KEY -w 2>/dev/null)"
 ```
 
-`mm doctor` warns about likely plain-text secrets in shell dotfiles, loose `~/.ssh` permissions, and SSH private keys that are not `600`. Secret values are masked in the output.
+`mm doctor` scans shell dotfiles for likely plain-text secrets and masks their values in the output. It also shows an inventory of SSH private keys in `~/.ssh` — name, type, bits, fingerprint, and modification date — and warns on loose directory/file permissions, DSA keys, and short RSA keys (< 3072b). Only group or other access triggers a warning; common safe modes are `600` and `400`.
 
 Use passphrases for SSH private keys. macOS can remember those passphrases in Keychain.
 

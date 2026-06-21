@@ -237,13 +237,16 @@ DOTFILES_TO_SCAN=(
 )
 PLAIN_SECRET_FOUND=0
 
+# Assignments with secret-like names where the value looks literal.
+# Dynamic values via $(), $VAR, `cmd`, or empty quotes are intentionally skipped.
+SECRET_NAME_RE='^[[:space:]]*(export[[:space:]]+)?((API_?KEY|ACCESS_KEY|TOKEN|SECRET|PASSWORD|PRIVATE_?KEY)[A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*_(API_?KEY|ACCESS_KEY|TOKEN|SECRET|PASSWORD|PRIVATE_?KEY)[A-Za-z0-9_]*)[[:space:]]*='
+DYNAMIC_VALUE_RE='=[[:space:]]*([$`]|"[$`]|'"'"'[$`]|""|'\'''\''|$)'
+
 for dotfile in "${DOTFILES_TO_SCAN[@]}"; do
     [[ -f "$dotfile" ]] || continue
 
-    # Find likely secret assignments where the value looks literal. Dynamic
-    # values loaded through command/variable expansion are intentionally OK.
-    MATCHES="$(grep -nE '^[[:space:]]*(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*(API_?KEY|KEY|TOKEN|SECRET|PASSWORD|PRIVATE_?KEY)[A-Za-z0-9_]*[[:space:]]*=' \
-        "$dotfile" 2>/dev/null | grep -vE '=[[:space:]]*([$`]|""|'\'''\''|$)' || true)"
+    MATCHES="$(grep -nE "$SECRET_NAME_RE" "$dotfile" 2>/dev/null \
+        | grep -vE "$DYNAMIC_VALUE_RE" || true)"
 
     if [[ -n "$MATCHES" ]]; then
         check_warn "Possible plain-text secret in $(basename "$dotfile"); move it to Keychain or your password manager:"
@@ -259,7 +262,7 @@ if [[ "$PLAIN_SECRET_FOUND" -eq 0 ]]; then
     check_ok "No plain-text secrets detected in dotfiles"
 fi
 
-# SSH private key permissions
+# SSH private keys — existence and hygiene
 if [[ -d "$HOME/.ssh" ]]; then
     check_ok "$HOME/.ssh folder exists"
 
@@ -268,19 +271,59 @@ if [[ -d "$HOME/.ssh" ]]; then
         check_warn "$HOME/.ssh has permissions $SSH_DIR_PERMS; recommended: chmod 700 \"$HOME/.ssh\""
     fi
 
-    BAD_SSH_PERMS=0
+    echo
+    echo "   🗝  SSH private keys:"
+    echo
+
+    SSH_KEY_COUNT=0
+    SSH_WARN=0
+
     while IFS= read -r keyfile; do
-        perms="$(stat -f "%A" "$keyfile" 2>/dev/null || true)"
-        if [[ "$perms" != "600" ]]; then
-            check_warn "SSH private key has wrong permissions ($perms): $(basename "$keyfile") — fix: chmod 600 \"$keyfile\""
-            BAD_SSH_PERMS=1
+        header="$(head -1 "$keyfile" 2>/dev/null || true)"
+        echo "$header" | grep -qE '^-----BEGIN (OPENSSH|RSA|EC|DSA) PRIVATE KEY-----' || continue
+
+        KEYGEN_OUT="$(ssh-keygen -l -f "$keyfile" 2>/dev/null || true)"
+        [[ -z "$KEYGEN_OUT" ]] && continue
+
+        SSH_KEY_COUNT=$((SSH_KEY_COUNT + 1))
+        keyname="$(basename "$keyfile")"
+        BITS="$(awk '{print $1}' <<< "$KEYGEN_OUT")"
+        FINGERPRINT="$(awk '{print $2}' <<< "$KEYGEN_OUT")"
+        KEY_TYPE="$(grep -oE '\([A-Z0-9-]+\)$' <<< "$KEYGEN_OUT" | tr -d '()' | tr '[:upper:]' '[:lower:]')"
+        MODIFIED="$(stat -f "%Sm" -t "%Y-%m-%d" "$keyfile" 2>/dev/null || echo "?")"
+        PERMS="$(stat -f "%A" "$keyfile" 2>/dev/null || true)"
+
+        FLAGS=""
+        if [[ "${PERMS: -2}" != "00" ]]; then
+            FLAGS="⚠ perms $PERMS (group/other access)"
+            SSH_WARN=$((SSH_WARN + 1))
         fi
+        KEY_TYPE_UPPER="$(echo "$KEY_TYPE" | tr '[:lower:]' '[:upper:]')"
+        if [[ "$KEY_TYPE_UPPER" == "DSA" ]]; then
+            [[ -n "$FLAGS" ]] && FLAGS="$FLAGS  "
+            FLAGS="${FLAGS}⚠ DSA (onveilig)"
+            SSH_WARN=$((SSH_WARN + 1))
+        elif [[ "$KEY_TYPE_UPPER" == "RSA" && -n "$BITS" && "$BITS" -lt 3072 ]]; then
+            [[ -n "$FLAGS" ]] && FLAGS="$FLAGS  "
+            FLAGS="${FLAGS}⚠ RSA < 3072b"
+            SSH_WARN=$((SSH_WARN + 1))
+        fi
+
+        printf "   %-24s %-7s %4sb  %-47s  gewijzigd: %s  perms: %s%s\n" \
+            "$keyname" "$KEY_TYPE" "$BITS" "$FINGERPRINT" "$MODIFIED" "$PERMS" \
+            "${FLAGS:+  $FLAGS}"
+
     done < <(find "$HOME/.ssh" -maxdepth 1 -type f \
         ! -name "*.pub" ! -name "known_hosts" ! -name "known_hosts.old" \
-        ! -name "config" ! -name "authorized_keys" 2>/dev/null)
+        ! -name "config" ! -name "authorized_keys" 2>/dev/null | sort)
 
-    if [[ "$BAD_SSH_PERMS" -eq 0 ]]; then
-        check_ok "SSH private key permissions OK (600)"
+    echo
+    if [[ "$SSH_KEY_COUNT" -eq 0 ]]; then
+        check_warn "Geen SSH private keys gevonden in ~/.ssh"
+    elif [[ "$SSH_WARN" -eq 0 ]]; then
+        check_ok "$SSH_KEY_COUNT SSH private key(s) — geen hygiëneproblemen"
+    else
+        check_warn "$SSH_KEY_COUNT SSH private key(s) — $SSH_WARN aandachtspunt(en) (zie boven)"
     fi
 else
     check_warn "$HOME/.ssh folder not found"
