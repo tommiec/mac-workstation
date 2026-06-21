@@ -1,7 +1,8 @@
 #!/bin/bash
 # =========================================================
 # mm_backup_ssh.sh
-# Backup ~/.ssh into an encrypted iCloud sparsebundle
+# Mirror ~/.ssh into ssh-backup/ inside an encrypted iCloud sparsebundle.
+# Creates pem-archive/ as a separate manual area, but never syncs it.
 # =========================================================
 
 set -o pipefail
@@ -13,6 +14,7 @@ source "$SCRIPT_DIR/mm_common.sh"
 VAULT_PATH="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Secure Vault/Secrets.sparsebundle"
 VAULT_NAME="Secrets"
 VAULT_SIZE="2g"
+MOUNT_POINT="/Volumes/$VAULT_NAME"
 SSH_SOURCE="$HOME/.ssh"
 
 echo "── 🔐 SSH backup ──"
@@ -26,8 +28,8 @@ if [[ ! -d "$SSH_SOURCE" ]]; then
     exit 1
 fi
 
-if ! command -v hdiutil >/dev/null 2>&1 || ! command -v rsync >/dev/null 2>&1; then
-    echo "❌ Required macOS tools not found: hdiutil and rsync"
+if ! command -v diskutil >/dev/null 2>&1 || ! command -v hdiutil >/dev/null 2>&1 || ! command -v rsync >/dev/null 2>&1; then
+    echo "❌ Required macOS tools not found: diskutil, hdiutil, and rsync"
     exit 1
 fi
 
@@ -37,12 +39,11 @@ if [[ ! -e "$VAULT_PATH" ]]; then
     echo "Creating encrypted sparsebundle..."
     echo "Choose a strong password and store it in your password manager."
     echo
-    if ! hdiutil create \
-        -type SPARSEBUNDLE \
-        -size "$VAULT_SIZE" \
-        -fs APFS \
-        -volname "$VAULT_NAME" \
-        -encryption AES-256 \
+    if ! diskutil image create blank \
+        --encrypt \
+        --size "$VAULT_SIZE" \
+        --volumeName "$VAULT_NAME" \
+        --fs APFS \
         "$VAULT_PATH"; then
         echo "❌ Could not create encrypted sparsebundle"
         exit 1
@@ -50,36 +51,18 @@ if [[ ! -e "$VAULT_PATH" ]]; then
     echo
 fi
 
-MOUNT_POINT=""
 MOUNTED_BY_SCRIPT=0
-find_mounted_vault() {
-    hdiutil info 2>/dev/null | awk -v image="$VAULT_PATH" '
-        /^[[:space:]]*image-path[[:space:]]*:/ {
-            current = $0
-            sub(/^[^:]*:[[:space:]]*/, "", current)
-        }
-        current == image && /^[[:space:]]*mount-point[[:space:]]*:/ {
-            mount = $0
-            sub(/^[^:]*:[[:space:]]*/, "", mount)
-            print mount
-            exit
-        }
-    '
-}
 
 cleanup() {
     local status="$1"
-
-    if [[ "$MOUNTED_BY_SCRIPT" -eq 1 && -n "$MOUNT_POINT" && -d "$MOUNT_POINT" ]]; then
-        hdiutil detach "$MOUNT_POINT" >/dev/null 2>&1 || true
+    if [[ "$MOUNTED_BY_SCRIPT" -eq 1 && -d "$MOUNT_POINT" ]]; then
+        diskutil eject "$MOUNT_POINT" >/dev/null 2>&1 || true
     fi
-
     record_script_result "mm_backup_ssh.sh" "$status"
 }
 trap 'status=$?; cleanup "$status"' EXIT
 
-MOUNT_POINT="$(find_mounted_vault)"
-if [[ -n "$MOUNT_POINT" && -d "$MOUNT_POINT" ]]; then
+if [[ -d "$MOUNT_POINT" ]]; then
     echo "Using already mounted vault: $MOUNT_POINT"
 else
     echo "Mounting vault..."
@@ -87,18 +70,16 @@ else
         echo "❌ Could not mount encrypted sparsebundle"
         exit 1
     fi
-
     MOUNTED_BY_SCRIPT=1
-    MOUNT_POINT="$(find_mounted_vault)"
 fi
 
-if [[ -z "$MOUNT_POINT" || ! -d "$MOUNT_POINT" ]]; then
+if [[ ! -d "$MOUNT_POINT" ]]; then
     echo "❌ Could not determine vault mount point"
     exit 1
 fi
 
-BACKUP_ROOT="$MOUNT_POINT/Secrets/ssh-backup"
-PEM_ARCHIVE="$MOUNT_POINT/Secrets/pem-archive"
+BACKUP_ROOT="$MOUNT_POINT/ssh-backup"
+PEM_ARCHIVE="$MOUNT_POINT/pem-archive"
 mkdir -p "$BACKUP_ROOT" "$PEM_ARCHIVE"
 
 echo "Syncing ~/.ssh..."

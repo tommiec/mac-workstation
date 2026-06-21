@@ -146,13 +146,13 @@ macOS asks for the vault password each time it needs to be mounted. On the first
 Inside the mounted vault, SSH and PEM material have different lifecycles:
 
 ```text
-Secrets/ssh-backup/
-Secrets/pem-archive/
+ssh-backup/
+pem-archive/
 ```
 
-`Secrets/ssh-backup/` is managed by the optional SSH backup prompt in `mm maintain`. It mirrors `~/.ssh` into the encrypted vault and may overwrite that backup on future runs.
+`ssh-backup/` is managed by the optional SSH backup prompt in `mm maintain`. It mirrors `~/.ssh` into the encrypted vault and may overwrite that backup on future runs.
 
-`Secrets/pem-archive/` is manual storage for PEM/private-key files that should live only inside the encrypted vault. The SSH backup command creates the folder but never syncs, cleans, or overwrites it.
+`pem-archive/` is manual storage for PEM/private-key files that should live only inside the encrypted vault. The SSH backup command creates the folder but never syncs, cleans, or overwrites it.
 
 Unmount the vault after use and let iCloud Drive finish syncing before shutting down or editing it elsewhere.
 
