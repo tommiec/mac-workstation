@@ -102,13 +102,8 @@ CLI_TOOLS=(
   uv
 
   # DevOps / containers / cloud-native
-  ansible
   docker
   docker-compose
-  helm
-  k9s
-  kubectl
-  terraform
   trivy
 
   # Security / reverse engineering
