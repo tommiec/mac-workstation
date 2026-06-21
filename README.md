@@ -18,9 +18,10 @@ One-time setup. Runs automatically. Manual control when needed.
 |---|---|
 | `mm_install.sh` | Bootstrap setup (repo, symlink, CLI, launchd) |
 | `mm_auto.sh` | Automated weekly maintenance (launchd) |
-| `mm_maintain.sh` | Run maintenance now: Homebrew, DNS flush, macOS updates |
+| `mm_maintain.sh` | Run maintenance now: Homebrew, DNS flush, macOS updates, optional SSH backup |
 | `mm_doctor.sh` | Health checks and diagnostics (`mm doctor`) |
 | `mm_triage.sh` | Quick file/malware triage with hash, VirusTotal and strings (`mm triage`) |
+| `mm_backup_ssh.sh` | Backup `~/.ssh` to an encrypted iCloud sparsebundle (called by `mm maintain`) |
 | `mm_common.sh` | Shared configuration and helpers (app list lives here) |
 
 ## How it works
@@ -82,7 +83,7 @@ Useful on a new Mac before Git is configured. The installer copies scripts from 
 
 ```bash
 mm auto      # run automated maintenance now
-mm maintain  # run maintenance now
+mm maintain  # run maintenance now (includes SSH backup prompt)
 mm install   # re-run setup
 mm doctor    # check system health
 mm triage <file>  # inspect a suspicious file
@@ -131,6 +132,29 @@ export ANTHROPIC_API_KEY="$(security find-generic-password -a "$USER" -s ANTHROP
 `mm doctor` scans shell dotfiles for likely plain-text secrets and masks their values in the output. It also shows an inventory of SSH private keys in `~/.ssh` — name, type, bits, fingerprint, and modification date — and warns on loose directory/file permissions, DSA keys, and short RSA keys (< 3072b). Only group or other access triggers a warning; common safe modes are `600` and `400`. For SSH trust awareness, it also summarizes `known_hosts` with visible and hashed host patterns, modification date, and a small visible sample when available.
 
 Use passphrases for SSH private keys. macOS can remember those passphrases in Keychain.
+
+### Encrypted secrets vault
+
+For secrets that should be recoverable on a new Mac but should not live as plain files in iCloud Drive, this setup uses one encrypted sparsebundle:
+
+```bash
+~/Library/Mobile Documents/com~apple~CloudDocs/Secure Vault/Secrets.sparsebundle
+```
+
+macOS asks for the vault password each time it needs to be mounted. On the first run it also asks you to choose that password — store it in your password manager. The script never stores or logs the vault password.
+
+Inside the mounted vault, SSH and PEM material have different lifecycles:
+
+```text
+Secrets/ssh-backup/
+Secrets/pem-archive/
+```
+
+`Secrets/ssh-backup/` is managed by the optional SSH backup prompt in `mm maintain`. It mirrors `~/.ssh` into the encrypted vault and may overwrite that backup on future runs.
+
+`Secrets/pem-archive/` is manual storage for PEM/private-key files that should live only inside the encrypted vault. The SSH backup command creates the folder but never syncs, cleans, or overwrites it.
+
+Unmount the vault after use and let iCloud Drive finish syncing before shutting down or editing it elsewhere.
 
 ## Notes
 

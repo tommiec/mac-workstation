@@ -128,6 +128,21 @@ else
     fi
 fi
 
+# ── SSH backup ───────────────────────
+echo
+echo "── 🔐 SSH backup ─────────────────────────────────"
+
+read -r -p "   Backup ~/.ssh to encrypted iCloud vault? (y/N): " confirm_backup
+if [[ "$confirm_backup" =~ ^[Yy]$ ]]; then
+    if bash "$SCRIPT_DIR/mm_backup_ssh.sh"; then
+        log_ok "SSH backup completed"
+    else
+        log_warn "SSH backup failed"
+    fi
+else
+    log_info "SSH backup skipped"
+fi
+
 notify_user "Mac Manager completed" "Maintenance run finished."
 
 summary_print
