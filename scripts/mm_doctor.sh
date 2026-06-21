@@ -325,6 +325,31 @@ if [[ -d "$HOME/.ssh" ]]; then
     else
         check_warn "$SSH_KEY_COUNT SSH private key(s) — $SSH_WARN aandachtspunt(en) (zie boven)"
     fi
+
+    echo
+    echo "   🧭 SSH known hosts:"
+    echo
+
+    KNOWN_HOSTS_FILE="$HOME/.ssh/known_hosts"
+    if [[ -f "$KNOWN_HOSTS_FILE" ]]; then
+        KH_MODIFIED="$(stat -f "%Sm" -t "%Y-%m-%d" "$KNOWN_HOSTS_FILE" 2>/dev/null || echo "?")"
+        KH_PERMS="$(stat -f "%A" "$KNOWN_HOSTS_FILE" 2>/dev/null || echo "?")"
+        KH_HOSTS="$(awk 'NF && $1 !~ /^#/ && $1 !~ /^\|1\|/ && !seen[$1]++ { count++ } END { print count + 0 }' "$KNOWN_HOSTS_FILE" 2>/dev/null)"
+        KH_HASHED="$(awk 'NF && $1 ~ /^\|1\|/ && !seen[$0]++ { count++ } END { print count + 0 }' "$KNOWN_HOSTS_FILE" 2>/dev/null)"
+
+        printf "   known_hosts              visible: %s  hashed: %s  gewijzigd: %s  perms: %s\n" \
+            "$KH_HOSTS" "$KH_HASHED" "$KH_MODIFIED" "$KH_PERMS"
+
+        KH_SAMPLE="$(awk 'NF && $1 !~ /^#/ && $1 !~ /^\|1\|/ && !seen[$1]++ { sample = sample (sample ? ", " : "") $1; shown++ } shown == 6 { exit } END { print sample }' \
+            "$KNOWN_HOSTS_FILE" 2>/dev/null)"
+        if [[ -n "$KH_SAMPLE" ]]; then
+            echo "      sample: $KH_SAMPLE"
+        elif [[ "$KH_HASHED" -gt 0 ]]; then
+            echo "      sample: hosts zijn gehashed"
+        fi
+    else
+        check_warn "Geen ~/.ssh/known_hosts gevonden"
+    fi
 else
     check_warn "$HOME/.ssh folder not found"
 fi
