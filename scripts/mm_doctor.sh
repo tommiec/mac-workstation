@@ -252,7 +252,10 @@ for dotfile in "${DOTFILES_TO_SCAN[@]}"; do
         check_warn "Possible plain-text secret in $(basename "$dotfile"); move it to Keychain or your password manager:"
         while IFS= read -r line; do
             # Mask values so secrets never appear in doctor output or logs.
-            echo "      ${line%%=*}=<hidden>"
+            line_no="${line%%:*}"
+            assignment="${line#*:}"
+            secret_name="$(echo "$assignment" | sed -E 's/^[[:space:]]*(export[[:space:]]+)?//; s/[[:space:]]*=.*$//')"
+            echo "      $(basename "$dotfile"):$line_no  $secret_name=<hidden>"
         done <<< "$MATCHES"
         PLAIN_SECRET_FOUND=1
     fi
@@ -271,10 +274,6 @@ if [[ -d "$HOME/.ssh" ]]; then
         check_warn "$HOME/.ssh has permissions $SSH_DIR_PERMS; recommended: chmod 700 \"$HOME/.ssh\""
     fi
 
-    echo
-    echo "   🗝  SSH private keys:"
-    echo
-
     SSH_KEY_COUNT=0
     SSH_WARN=0
 
@@ -284,6 +283,12 @@ if [[ -d "$HOME/.ssh" ]]; then
 
         KEYGEN_OUT="$(ssh-keygen -l -f "$keyfile" 2>/dev/null || true)"
         [[ -z "$KEYGEN_OUT" ]] && continue
+
+        if [[ "$SSH_KEY_COUNT" -eq 0 ]]; then
+            echo
+            echo "   🗝  SSH private keys:"
+            echo
+        fi
 
         SSH_KEY_COUNT=$((SSH_KEY_COUNT + 1))
         keyname="$(basename "$keyfile")"
@@ -319,7 +324,9 @@ if [[ -d "$HOME/.ssh" ]]; then
 
     echo
     if [[ "$SSH_KEY_COUNT" -eq 0 ]]; then
-        check_warn "Geen SSH private keys gevonden in ~/.ssh"
+        echo "   🗝  SSH private keys:"
+        echo "      none found"
+        check_ok "No SSH private keys found in ~/.ssh"
     elif [[ "$SSH_WARN" -eq 0 ]]; then
         check_ok "$SSH_KEY_COUNT SSH private key(s) — geen hygiëneproblemen"
     else
@@ -340,10 +347,13 @@ if [[ -d "$HOME/.ssh" ]]; then
         printf "   known_hosts              visible: %s  hashed: %s  gewijzigd: %s  perms: %s\n" \
             "$KH_HOSTS" "$KH_HASHED" "$KH_MODIFIED" "$KH_PERMS"
 
-        KH_SAMPLE="$(awk 'NF && $1 !~ /^#/ && $1 !~ /^\|1\|/ && !seen[$1]++ { sample = sample (sample ? ", " : "") $1; shown++ } shown == 6 { exit } END { print sample }' \
+        KH_SAMPLE="$(awk 'NF && $1 !~ /^#/ && $1 !~ /^\|1\|/ && !seen[$1]++ { print $1; shown++ } shown == 6 { exit }' \
             "$KNOWN_HOSTS_FILE" 2>/dev/null)"
         if [[ -n "$KH_SAMPLE" ]]; then
-            echo "      sample: $KH_SAMPLE"
+            echo "      sample:"
+            while IFS= read -r host; do
+                echo "        - $host"
+            done <<< "$KH_SAMPLE"
         elif [[ "$KH_HASHED" -gt 0 ]]; then
             echo "      sample: hosts zijn gehashed"
         fi

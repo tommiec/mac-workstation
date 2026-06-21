@@ -23,17 +23,49 @@ source "$SCRIPT_DIR/mm_common.sh"
 mkdir -p "$LOG_DIR"
 RUN_LOG="$LOG_DIR/auto_$(date '+%Y-%m-%d_%H-%M-%S').log"
 exec > >(tee -a "$RUN_LOG") 2>&1
-trap 'status=$?; record_script_result "mm_auto.sh" "$status" "$RUN_LOG"' EXIT
+trap 'record_script_result "mm_auto.sh" "$?" "$RUN_LOG"' EXIT
 
 notify_user "Mac Manager started" "Automated maintenance started."
 
 echo "── ⚡ Auto maintenance ──"
 
+run_quiet_step() {
+    local msg="$1"; shift
+    local tmp_out
+
+    tmp_out="$(mktemp "${TMPDIR:-/tmp}/mm_auto_step.XXXXXX")" || {
+        log_warn "$msg failed (could not create temp log)"
+        return 1
+    }
+
+    if "$@" > "$tmp_out" 2>&1; then
+        cat "$tmp_out" >> "$RUN_LOG"
+        rm -f "$tmp_out"
+        log_ok "$msg"
+    else
+        cat "$tmp_out" >> "$RUN_LOG"
+        log_warn "$msg failed"
+        echo "      Last output:"
+        tail -n 12 "$tmp_out" | sed 's/^/      /'
+        rm -f "$tmp_out"
+        return 1
+    fi
+}
+
 # ── Self-update ──────────────────────
 
+echo
+echo "── 🔄 Scripts ────────────────────────────────────"
+
 if [[ -d "$REPO_ROOT/.git" ]] && command -v git &>/dev/null; then
-    if GIT_TERMINAL_PROMPT=0 git -C "$REPO_ROOT" pull --ff-only --quiet 2>/dev/null; then
-        log_ok "Scripts updated from GitHub"
+    BEFORE_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
+    if GIT_TERMINAL_PROMPT=0 git -C "$REPO_ROOT" pull --ff-only --quiet >> "$RUN_LOG" 2>&1; then
+        AFTER_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
+        if [[ -n "$BEFORE_SHA" && "$BEFORE_SHA" == "$AFTER_SHA" ]]; then
+            log_ok "Scripts already up to date"
+        else
+            log_ok "Scripts updated from GitHub"
+        fi
     else
         log_warn "Script update failed (offline or diverged); continuing with local version"
     fi
@@ -43,11 +75,26 @@ fi
 # brew is checked through command -v, not ensure_brew:
 # in a scheduled night job, we do not want to start an interactive Homebrew install.
 
+echo
+echo "── 🍺 Homebrew ───────────────────────────────────"
+
 if command -v brew &>/dev/null; then
-    run_step "brew update"     brew update
-    run_step "brew upgrade"    brew upgrade --formula
-    run_step "brew cleanup"    brew cleanup --prune=30
-    run_step "brew autoremove" brew autoremove
+    run_quiet_step "brew update" brew update
+
+    OUTDATED_FORMULAS="$(brew outdated --formula --quiet 2>/dev/null || true)"
+    OUTDATED_COUNT="$(echo "$OUTDATED_FORMULAS" | awk 'NF { count++ } END { print count + 0 }')"
+    if [[ "$OUTDATED_COUNT" -eq 0 ]]; then
+        log_ok "No outdated Homebrew formulas"
+    else
+        echo "   ℹ️  $OUTDATED_COUNT Homebrew formula(s) to upgrade"
+        while IFS= read -r formula; do
+            [[ -n "$formula" ]] && echo "      - $formula"
+        done <<< "$OUTDATED_FORMULAS"
+        run_quiet_step "brew upgrade ($OUTDATED_COUNT formula(s))" brew upgrade --formula
+    fi
+
+    run_quiet_step "brew cleanup" brew cleanup --prune=30
+    run_quiet_step "brew autoremove" brew autoremove
 else
     log_warn "brew unavailable — skipping brew steps"
 fi
@@ -56,6 +103,9 @@ fi
 # Detect and report only; installation happens through 'mm maintain'.
 # softwareupdate --list writes to stderr; 2>&1 captures it.
 # grep -c exits with 1 for 0 matches; || true handles that.
+
+echo
+echo "── 🍎 macOS ──────────────────────────────────────"
 
 UPDATES="$(/usr/sbin/softwareupdate --list 2>&1 || true)"
 COUNT=$(echo "$UPDATES" | grep -cE '^[[:space:]]*\*' || true)
@@ -74,6 +124,9 @@ fi
 # (for example com.apple.bird for iCloud) are intentionally not excluded:
 # files older than 7 days are rarely in use there at 02:00.
 # Adjust the -mtime threshold if this causes issues.
+
+echo
+echo "── 🧹 Cache cleanup ──────────────────────────────"
 
 DELETED=$(
     /usr/bin/find "$HOME/Library/Caches" \

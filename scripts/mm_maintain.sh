@@ -24,13 +24,20 @@ source "$SCRIPT_DIR/mm_common.sh"
 
 RUN_LOG="$LOG_DIR/maintain_$(date '+%Y-%m-%d_%H-%M-%S').log"
 
+echo "── 🔍 Mac Manager maintenance ──"
+echo
+echo "This command needs administrator permission to flush DNS and install macOS updates."
+echo "macOS will ask for your password now; it is handled by sudo and is never logged."
+echo
+
 # ── Sudo ─────────────────────────────
 # sudo -v asks for the password once and validates the session.
 # The keepalive loop refreshes the sudo timestamp every 50 seconds,
 # so long-running steps (for example softwareupdate) do not block.
 
 if ! sudo -v; then
-    echo "Sudo failed — script aborted."
+    echo
+    echo "❌ Administrator authentication failed. Maintenance aborted."
     exit 1
 fi
 
@@ -55,20 +62,29 @@ exec > >(tee -a "$RUN_LOG") 2>&1
 
 notify_user "Mac Manager started" "Maintenance run started."
 
-echo "── 🔍 Mac Manager maintenance ──"
+echo
+echo "── 🍺 Homebrew ───────────────────────────────────"
 
 # ── Brew doctor ──────────────────────
 # brew doctor exits with 0 on a healthy system, otherwise 1.
 # We show the full output and log based on the exit code,
 # not by grepping the output (more robust across Homebrew text changes).
 
-if brew doctor; then
+BREW_DOCTOR_STATUS=0
+BREW_DOCTOR_OUT="$(brew doctor 2>&1)" || BREW_DOCTOR_STATUS=$?
+echo "$BREW_DOCTOR_OUT" >> "$RUN_LOG"
+
+if [[ "$BREW_DOCTOR_STATUS" -eq 0 ]]; then
     log_ok "brew doctor OK"
 else
-    log_warn "brew doctor reported warnings — see output above"
+    log_warn "brew doctor reported warnings — details saved to $RUN_LOG"
+    echo "$BREW_DOCTOR_OUT" | grep -E '^(Warning:|Error:)' | head -n 5 | sed 's/^/      /' || true
 fi
 
 # ── DNS flush ────────────────────────
+
+echo
+echo "── 🌐 DNS ────────────────────────────────────────"
 
 if sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder; then
     log_ok "DNS cache flushed"
@@ -79,8 +95,11 @@ fi
 # ── macOS updates ────────────────────
 # grep -c exits with 1 for 0 matches; || true handles that.
 
+echo
+echo "── 🍎 macOS updates ──────────────────────────────"
+
 UPDATES="$(/usr/sbin/softwareupdate --list 2>&1 || true)"
-echo "$UPDATES"
+echo "$UPDATES" >> "$RUN_LOG"
 
 COUNT=$(echo "$UPDATES" | grep -cE '^[[:space:]]*\*' || true)
 COUNT=${COUNT:-0}
@@ -89,6 +108,7 @@ if [[ "$COUNT" -eq 0 ]]; then
     log_ok "No macOS updates available"
 else
     log_warn "$COUNT macOS update(s) available"
+    echo "$UPDATES" | awk '/^[[:space:]]*\*/ { sub(/^[[:space:]]*\*[[:space:]]*/, ""); print "      - " $0 }'
 
     read -r -p "   Install updates? (y/N): " confirm
 

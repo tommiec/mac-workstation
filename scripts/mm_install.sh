@@ -49,19 +49,21 @@ mkdir -p "$BIN_DIR"
 echo "── 🚀 Installation started ──"
 
 # ── Copy scripts to install location ─────────────────────
-# Each copy is logged separately so errors are visible.
+# Copies are summarized so repeat installs stay readable.
 # mm_install.sh intentionally copies itself, so 'mm install'
 # always runs the latest installed version.
 
 COPY_OK=true
+COPY_IDENTICAL=0
+COPY_UPDATED=0
 for f in mm_common.sh mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh; do
     SRC="$SRC_DIR/$f"
     DST="$TARGET_DIR/$f"
 
     if cmp -s "$SRC" "$DST" 2>/dev/null; then
-        echo "   ✔️ $f identical (skipped)"
+        COPY_IDENTICAL=$((COPY_IDENTICAL + 1))
     elif cp "$SRC" "$DST"; then
-        echo "   ✅ $f copied"
+        COPY_UPDATED=$((COPY_UPDATED + 1))
     else
         echo "   ❌ failed to copy $f"
         COPY_OK=false
@@ -74,6 +76,11 @@ if [[ "$COPY_OK" == false ]]; then
 fi
 
 chmod +x "$TARGET_DIR"/*.sh
+if [[ "$COPY_UPDATED" -eq 0 ]]; then
+    echo "   ✅ Scripts unchanged ($COPY_IDENTICAL checked)"
+else
+    echo "   ✅ Scripts updated ($COPY_UPDATED copied, $COPY_IDENTICAL unchanged)"
+fi
 
 # ── Symlink to ~/Scripts/mac-workstation ─────────────────
 
@@ -133,9 +140,10 @@ chmod +x "$MM_PATH"
 
 source "$TARGET_DIR/mm_common.sh"
 mkdir -p "$LOG_DIR"
-trap 'status=$?; record_script_result "mm_install.sh" "$status"' EXIT
+trap 'record_script_result "mm_install.sh" "$?"' EXIT
 
-# ── Homebrew ─────────────────────────
+echo
+echo "── 🍺 Homebrew ───────────────────────────────────"
 
 if ensure_brew; then
     log_ok "Homebrew available"
@@ -146,31 +154,71 @@ fi
 
 run_step "brew update" brew update
 
-# ── Git global configuration ─────────
+echo
+echo "── ⚙️  Configuration ─────────────────────────────"
 
 run_step "git global exclude setup" setup_git_global
 
 # ── Install apps ─────────────────────
 
+echo
+echo "── 📦 Applications ───────────────────────────────"
+
+CASK_PRESENT=0
+CASK_INSTALLED=0
+CASK_FAILED=0
+CASK_FAILED_NAMES=""
 for pkg in "${MANAGED_CASKS[@]}"; do
     if brew list --cask "$pkg" &>/dev/null; then
-        log_ok "$pkg already installed"
+        CASK_PRESENT=$((CASK_PRESENT + 1))
     else
-        run_step "install $pkg" brew install --cask "$pkg"
+        echo "   Installing cask: $pkg"
+        if brew install --cask "$pkg"; then
+            CASK_INSTALLED=$((CASK_INSTALLED + 1))
+        else
+            CASK_FAILED=$((CASK_FAILED + 1))
+            CASK_FAILED_NAMES="${CASK_FAILED_NAMES:+$CASK_FAILED_NAMES, }$pkg"
+        fi
     fi
 done
 
+if [[ "$CASK_FAILED" -eq 0 ]]; then
+    log_ok "Casks: $CASK_PRESENT already installed, $CASK_INSTALLED installed"
+else
+    log_warn "Casks: $CASK_PRESENT already installed, $CASK_INSTALLED installed, $CASK_FAILED failed ($CASK_FAILED_NAMES)"
+fi
+
+echo
+echo "── 🧰 CLI tools ──────────────────────────────────"
+
+TOOL_PRESENT=0
+TOOL_INSTALLED=0
+TOOL_FAILED=0
+TOOL_FAILED_NAMES=""
 for pkg in "${CLI_TOOLS[@]}"; do
     if brew list "$pkg" &>/dev/null; then
-        log_ok "$pkg already installed"
+        TOOL_PRESENT=$((TOOL_PRESENT + 1))
     else
-        run_step "install $pkg" brew install "$pkg"
+        echo "   Installing formula: $pkg"
+        if brew install "$pkg"; then
+            TOOL_INSTALLED=$((TOOL_INSTALLED + 1))
+        else
+            TOOL_FAILED=$((TOOL_FAILED + 1))
+            TOOL_FAILED_NAMES="${TOOL_FAILED_NAMES:+$TOOL_FAILED_NAMES, }$pkg"
+        fi
     fi
 done
+
+if [[ "$TOOL_FAILED" -eq 0 ]]; then
+    log_ok "CLI tools: $TOOL_PRESENT already installed, $TOOL_INSTALLED installed"
+else
+    log_warn "CLI tools: $TOOL_PRESENT already installed, $TOOL_INSTALLED installed, $TOOL_FAILED failed ($TOOL_FAILED_NAMES)"
+fi
 
 run_step "brew cleanup" brew cleanup
 
-# ── LaunchAgent ─────────────────────
+echo
+echo "── 🕰  Automation ────────────────────────────────"
 
 write_auto_launch_agent
 
