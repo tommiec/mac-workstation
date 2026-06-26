@@ -18,7 +18,7 @@ One-time setup. Runs automatically. Manual control when needed.
 |---|---|
 | `mm_install.sh` | Bootstrap setup (repo, symlink, CLI, launchd) |
 | `mm_auto.sh` | Automated weekly maintenance (launchd) |
-| `mm_maintain.sh` | Run maintenance now: Homebrew, DNS flush, macOS updates, optional SSH backup |
+| `mm_maintain.sh` | Run maintenance now: Homebrew, DNS flush, macOS updates, optional SSH backup, optional QuickTime history cleanup |
 | `mm_doctor.sh` | Health checks and diagnostics (`mm doctor`) |
 | `mm_triage.sh` | Quick file/malware triage with hash, VirusTotal and strings (`mm triage`) |
 | `mm_backup_ssh.sh` | Backup `~/.ssh` to an encrypted iCloud sparsebundle (called by `mm maintain`) |
@@ -83,12 +83,14 @@ Useful on a new Mac before Git is configured. The installer copies scripts from 
 
 ```bash
 mm auto      # run automated maintenance now
-mm maintain  # run maintenance now (includes SSH backup prompt)
+mm maintain  # run maintenance now (interactive prompts)
 mm install   # re-run setup
 mm doctor    # check system health
 mm triage <file>  # inspect a suspicious file
 mm help      # show available commands
 ```
+
+`mm maintain` asks before taking optional actions: installing macOS updates, backing up `~/.ssh` to the encrypted iCloud vault, and clearing QuickTime Player's recent documents history. The QuickTime cleanup removes QuickTime's app-specific recent-document shared-file-list entries and legacy QuickTime preference keys. It does not delete media files and does not clear system-wide macOS Recent Items.
 
 ## File triage
 

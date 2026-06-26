@@ -13,6 +13,7 @@
 #   - Flushes the DNS cache
 #   - Detects and optionally installs macOS updates
 #   - Optionally backs up ~/.ssh to the encrypted iCloud vault
+#   - Optionally clears QuickTime recent documents history
 #
 # Some steps request sudo only when needed.
 # =========================================================
@@ -117,6 +118,74 @@ if [[ "$confirm_backup" =~ ^[Yy]$ ]]; then
     fi
 else
     log_info "SSH backup skipped"
+fi
+
+clear_quicktime_history() {
+    local recents_dir="$HOME/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments"
+    local quicktime_running=""
+    local deleted_files=0
+    local deleted_prefs=0
+    local failed=0
+    local file=""
+    local key=""
+
+    quicktime_running="$(osascript -e 'application id "com.apple.QuickTimePlayerX" is running' 2>/dev/null || true)"
+    if [[ "$quicktime_running" == "true" ]]; then
+        if osascript -e 'tell application id "com.apple.QuickTimePlayerX" to quit' >/dev/null 2>&1; then
+            sleep 1
+        else
+            echo "   Could not quit QuickTime Player before clearing history"
+            failed=1
+        fi
+    fi
+
+    if [[ -d "$recents_dir" ]]; then
+        while IFS= read -r -d '' file; do
+            if rm -f "$file"; then
+                (( deleted_files++ )) || true
+            else
+                echo "   Could not remove QuickTime recent document file: $file"
+                failed=1
+            fi
+        done < <(find "$recents_dir" -maxdepth 1 -type f -name 'com.apple.quicktimeplayerx.sfl*' -print0 2>/dev/null)
+    fi
+
+    for key in NSRecentDocumentRecords MGPlayableDocumentHistory; do
+        if defaults read com.apple.QuickTimePlayerX "$key" >/dev/null 2>&1; then
+            if defaults delete com.apple.QuickTimePlayerX "$key" >/dev/null 2>&1; then
+                (( deleted_prefs++ )) || true
+            else
+                echo "   Could not delete QuickTime preference key: $key"
+                failed=1
+            fi
+        fi
+    done
+
+    if ! launchctl kickstart -k "gui/$(id -u)/com.apple.sharedfilelistd" >/dev/null 2>&1; then
+        log_info "sharedfilelistd restart skipped; recents may refresh after logout/login"
+    fi
+
+    if [[ "$failed" -ne 0 ]]; then
+        log_warn "QuickTime history cleanup incomplete"
+        return 1
+    fi
+
+    if [[ "$deleted_files" -eq 0 && "$deleted_prefs" -eq 0 ]]; then
+        log_ok "QuickTime history already clear"
+    else
+        log_ok "QuickTime history cleared ($deleted_files file(s), $deleted_prefs preference key(s))"
+    fi
+}
+
+# ── QuickTime history ────────────────
+echo
+echo "── 🎬 QuickTime history ──────────────────────────"
+
+read -r -p "   Clear QuickTime recent documents? (y/N): " confirm_qt
+if [[ "$confirm_qt" =~ ^[Yy]$ ]]; then
+    clear_quicktime_history
+else
+    log_info "QuickTime history skipped"
 fi
 
 notify_user "Mac Manager completed" "Maintenance run finished."

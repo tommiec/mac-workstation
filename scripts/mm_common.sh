@@ -53,7 +53,6 @@ MANAGED_CASKS=(
   # AI / media
   chatgpt
   claude
-  lm-studio
   macwhisper
   vlc
 
