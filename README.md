@@ -168,3 +168,7 @@ Unmount the vault after use and let iCloud Drive finish syncing before shutting 
 ## License
 
 MIT — Thomas Coppens
+
+## AI usage
+
+AI was used extensively to design and write the shell scripts, analyze errors, suggest improvements and help structure the documentation. I defined the requirements, reviewed the changes, tested the resulting workflows and remain responsible for the project and its maintenance.
