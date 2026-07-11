@@ -10,6 +10,7 @@
 #
 # What this script does:
 #   - Runs brew doctor
+#   - Optionally upgrades outdated Homebrew casks
 #   - Flushes the DNS cache
 #   - Detects and optionally installs macOS updates
 #   - Optionally backs up ~/.ssh to the encrypted iCloud vault
@@ -54,6 +55,39 @@ if [[ "$BREW_DOCTOR_STATUS" -eq 0 ]]; then
 else
     log_warn "brew doctor reported warnings — details saved to $RUN_LOG"
     echo "$BREW_DOCTOR_OUT" | grep -E '^(Warning:|Error:)' | head -n 5 | sed 's/^/      /' || true
+fi
+
+# ── Homebrew cask upgrades ───────────
+
+run_step "brew update" brew update
+
+OUTDATED_CASKS_RAW="$(brew outdated --cask --quiet 2>/dev/null || true)"
+OUTDATED_CASK_COUNT="$(printf '%s\n' "$OUTDATED_CASKS_RAW" | awk 'NF { count++ } END { print count + 0 }')"
+
+if [[ "$OUTDATED_CASK_COUNT" -eq 0 ]]; then
+    log_ok "No outdated Homebrew casks"
+else
+    log_warn "$OUTDATED_CASK_COUNT Homebrew cask(s) available for upgrade"
+    while IFS= read -r cask; do
+        [[ -n "$cask" ]] && echo "      - $cask"
+    done <<< "$OUTDATED_CASKS_RAW"
+
+    read -r -p "   Upgrade Homebrew casks? (y/N): " confirm_casks
+
+    if [[ "$confirm_casks" =~ ^[Yy]$ ]]; then
+        OUTDATED_CASKS=()
+        while IFS= read -r cask; do
+            [[ -n "$cask" ]] && OUTDATED_CASKS+=("$cask")
+        done <<< "$OUTDATED_CASKS_RAW"
+
+        if brew upgrade --cask "${OUTDATED_CASKS[@]}"; then
+            log_ok "Homebrew casks upgraded"
+        else
+            log_warn "Homebrew cask upgrade failed"
+        fi
+    else
+        log_info "Homebrew cask upgrades skipped"
+    fi
 fi
 
 # ── DNS flush ────────────────────────
