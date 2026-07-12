@@ -120,16 +120,22 @@ else
 fi
 
 GLOBAL_HOOKS="$(git config --global core.hooksPath 2>/dev/null || true)"
-if [[ "$GLOBAL_HOOKS" == "$GIT_HOOKS_DIR" ]]; then
+if [[ "$GLOBAL_HOOKS" == "$LOCAL_GIT_HOOKS_DIR" ]]; then
     check_ok "Global git hooks path configured: $GLOBAL_HOOKS"
 else
     check_fail "Global git hooks path not configured as expected"
 fi
 
-if [[ -x "$GIT_HOOKS_DIR/commit-msg" ]]; then
-    check_ok "commit-msg hook present and executable"
+if [[ -x "$LOCAL_GIT_HOOKS_DIR/commit-msg" ]]; then
+    check_ok "Local commit-msg hook present and executable"
 else
-    check_fail "commit-msg hook missing or not executable"
+    check_warn "Local commit-msg hook missing or not executable"
+fi
+
+if [[ -d "$ICLOUD_GIT_CONFIG_ROOT" ]]; then
+    check_ok "Optional iCloud git config source found: $ICLOUD_GIT_CONFIG_ROOT"
+else
+    check_warn "Optional iCloud git config source not found: $ICLOUD_GIT_CONFIG_ROOT"
 fi
 
 # ── GitHub version ──────────────────────────────────────
