@@ -54,6 +54,7 @@ The installer will:
 - install all apps from `MANAGED_CASKS` and `CLI_TOOLS` in `mm_common.sh`
 - create the symlink under `~/Scripts/mac-workstation`
 - install the `mm` command in `~/Scripts/bin`
+- configure global Git excludes and commit-message hygiene hooks
 - register the weekly launchd job
 
 To update later:
@@ -164,6 +165,9 @@ Unmount the vault after use and let iCloud Drive finish syncing before shutting 
 - Writes logs and last-run status under `~/Library/Logs/mac_manager/`
 - Safe to re-run `mm install` at any time, but usually only needed after installer-managed setup changes
 - `mm doctor` can be used to validate the setup and inspect the last recorded run for each script
+- Global Git hygiene is installed by `mm install`: `AGENTS.md` stays local-only
+  through the global exclude file, and the global `commit-msg` hook blocks
+  assistant/tool names and generated co-author trailers in commit messages.
 
 ## License
 

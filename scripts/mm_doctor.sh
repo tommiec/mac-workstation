@@ -102,6 +102,36 @@ else
     check_fail "Wrapper missing: $MM_PATH"
 fi
 
+# ── Git hygiene ─────────────────────────────────────────
+
+echo
+echo "── 🧹 Git hygiene ───────────────────────────────"
+
+GLOBAL_EXCLUDES="$(git config --global core.excludesFile 2>/dev/null || true)"
+if [[ "$GLOBAL_EXCLUDES" == "$HOME/.config/git/ignore" && -f "$GLOBAL_EXCLUDES" ]]; then
+    check_ok "Global git excludes configured: $GLOBAL_EXCLUDES"
+    if grep -Fxq "AGENTS.md" "$GLOBAL_EXCLUDES"; then
+        check_ok "Global git excludes include AGENTS.md"
+    else
+        check_fail "Global git excludes do not include AGENTS.md"
+    fi
+else
+    check_fail "Global git excludes not configured as expected"
+fi
+
+GLOBAL_HOOKS="$(git config --global core.hooksPath 2>/dev/null || true)"
+if [[ "$GLOBAL_HOOKS" == "$GIT_HOOKS_DIR" ]]; then
+    check_ok "Global git hooks path configured: $GLOBAL_HOOKS"
+else
+    check_fail "Global git hooks path not configured as expected"
+fi
+
+if [[ -x "$GIT_HOOKS_DIR/commit-msg" ]]; then
+    check_ok "commit-msg hook present and executable"
+else
+    check_fail "commit-msg hook missing or not executable"
+fi
+
 # ── GitHub version ──────────────────────────────────────
 
 if [[ -d "$REPO_ROOT/.git" ]]; then
