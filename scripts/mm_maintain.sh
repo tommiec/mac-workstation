@@ -42,6 +42,19 @@ echo "Passwords are handled by sudo and are never logged."
 echo
 echo "── 🍺 Homebrew ───────────────────────────────────"
 
+cask_is_managed() {
+    local cask="$1"
+    local managed_cask=""
+
+    for managed_cask in "${MANAGED_CASKS[@]}"; do
+        if [[ "$cask" == "$managed_cask" ]]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 # ── Brew doctor ──────────────────────
 # brew doctor exits with 0 on a healthy system, otherwise 1.
 # We show the full output and log based on the exit code,
@@ -62,29 +75,85 @@ fi
 
 run_step "brew update" brew update
 
+INSTALLED_UNMANAGED_CASKS=""
+while IFS= read -r installed_cask; do
+    [[ -n "$installed_cask" ]] || continue
+
+    if ! cask_is_managed "$installed_cask"; then
+        INSTALLED_UNMANAGED_CASKS="${INSTALLED_UNMANAGED_CASKS}${INSTALLED_UNMANAGED_CASKS:+$'\n'}$installed_cask"
+    fi
+done < <(brew list --cask 2>/dev/null || true)
+
+INSTALLED_UNMANAGED_CASK_COUNT="$(printf '%s\n' "$INSTALLED_UNMANAGED_CASKS" | awk 'NF { count++ } END { print count + 0 }')"
+if [[ "$INSTALLED_UNMANAGED_CASK_COUNT" -eq 0 ]]; then
+    log_ok "No unmanaged Homebrew casks installed"
+else
+    log_warn "$INSTALLED_UNMANAGED_CASK_COUNT unmanaged Homebrew cask(s) installed"
+    while IFS= read -r cask; do
+        [[ -n "$cask" ]] && echo "      - $cask"
+    done <<< "$INSTALLED_UNMANAGED_CASKS"
+fi
+
 OUTDATED_CASKS_RAW="$(brew outdated --cask --quiet 2>/dev/null || true)"
+OUTDATED_MANAGED_CASKS=""
+OUTDATED_UNMANAGED_CASKS=""
+
+while IFS= read -r cask; do
+    [[ -n "$cask" ]] || continue
+
+    if cask_is_managed "$cask"; then
+        OUTDATED_MANAGED_CASKS="${OUTDATED_MANAGED_CASKS}${OUTDATED_MANAGED_CASKS:+$'\n'}$cask"
+    else
+        OUTDATED_UNMANAGED_CASKS="${OUTDATED_UNMANAGED_CASKS}${OUTDATED_UNMANAGED_CASKS:+$'\n'}$cask"
+    fi
+done <<< "$OUTDATED_CASKS_RAW"
+
 OUTDATED_CASK_COUNT="$(printf '%s\n' "$OUTDATED_CASKS_RAW" | awk 'NF { count++ } END { print count + 0 }')"
+OUTDATED_MANAGED_CASK_COUNT="$(printf '%s\n' "$OUTDATED_MANAGED_CASKS" | awk 'NF { count++ } END { print count + 0 }')"
+OUTDATED_UNMANAGED_CASK_COUNT="$(printf '%s\n' "$OUTDATED_UNMANAGED_CASKS" | awk 'NF { count++ } END { print count + 0 }')"
 
 if [[ "$OUTDATED_CASK_COUNT" -eq 0 ]]; then
     log_ok "No outdated Homebrew casks"
 else
-    log_warn "$OUTDATED_CASK_COUNT Homebrew cask(s) available for upgrade"
+    log_warn "$OUTDATED_CASK_COUNT Homebrew cask(s) available for upgrade ($OUTDATED_MANAGED_CASK_COUNT managed, $OUTDATED_UNMANAGED_CASK_COUNT unmanaged)"
     while IFS= read -r cask; do
-        [[ -n "$cask" ]] && echo "      - $cask"
+        [[ -n "$cask" ]] || continue
+        if cask_is_managed "$cask"; then
+            echo "      - $cask (managed)"
+        else
+            echo "      - $cask (unmanaged)"
+        fi
     done <<< "$OUTDATED_CASKS_RAW"
 
-    read -r -p "   Upgrade Homebrew casks? (y/N): " confirm_casks
+    read -r -p "   Upgrade all outdated Homebrew casks? (y/N): " confirm_casks
 
     if [[ "$confirm_casks" =~ ^[Yy]$ ]]; then
         OUTDATED_CASKS=()
+        CASK_UPGRADED=0
+        CASK_FAILED=0
+        CASK_FAILED_NAMES=""
         while IFS= read -r cask; do
             [[ -n "$cask" ]] && OUTDATED_CASKS+=("$cask")
         done <<< "$OUTDATED_CASKS_RAW"
 
-        if brew upgrade --cask "${OUTDATED_CASKS[@]}"; then
-            log_ok "Homebrew casks upgraded"
+        for cask in "${OUTDATED_CASKS[@]}"; do
+            if cask_is_managed "$cask"; then
+                echo "   Upgrading cask: $cask (managed)"
+            else
+                echo "   Upgrading cask: $cask (unmanaged)"
+            fi
+            if brew upgrade --cask "$cask"; then
+                CASK_UPGRADED=$((CASK_UPGRADED + 1))
+            else
+                CASK_FAILED=$((CASK_FAILED + 1))
+                CASK_FAILED_NAMES="${CASK_FAILED_NAMES:+$CASK_FAILED_NAMES, }$cask"
+            fi
+        done
+
+        if [[ "$CASK_FAILED" -eq 0 ]]; then
+            log_ok "Homebrew casks upgraded ($CASK_UPGRADED)"
         else
-            log_warn "Homebrew cask upgrade failed"
+            log_warn "Homebrew casks: $CASK_UPGRADED upgraded, $CASK_FAILED failed ($CASK_FAILED_NAMES)"
         fi
     else
         log_info "Homebrew cask upgrades skipped"

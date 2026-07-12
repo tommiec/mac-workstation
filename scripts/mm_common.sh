@@ -73,7 +73,6 @@ MANAGED_CASKS=(
   # System utilities
   appcleaner
   monitorcontrol
-  onyx
   rectangle
   utm
 

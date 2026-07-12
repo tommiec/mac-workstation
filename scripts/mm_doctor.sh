@@ -252,6 +252,35 @@ if command -v brew >/dev/null 2>&1; then
     else
         check_warn "$OUTDATED_COUNT outdated Homebrew package(s)"
     fi
+
+    UNMANAGED_CASKS=""
+    while IFS= read -r installed_cask; do
+        [[ -n "$installed_cask" ]] || continue
+
+        CASK_IS_MANAGED=0
+        # MANAGED_CASKS is sourced from mm_common.sh.
+        # shellcheck disable=SC2153
+        for managed_cask in "${MANAGED_CASKS[@]}"; do
+            if [[ "$installed_cask" == "$managed_cask" ]]; then
+                CASK_IS_MANAGED=1
+                break
+            fi
+        done
+
+        if [[ "$CASK_IS_MANAGED" -eq 0 ]]; then
+            UNMANAGED_CASKS="${UNMANAGED_CASKS}${UNMANAGED_CASKS:+$'\n'}$installed_cask"
+        fi
+    done < <(brew list --cask 2>/dev/null || true)
+
+    UNMANAGED_CASK_COUNT="$(printf '%s\n' "$UNMANAGED_CASKS" | awk 'NF { count++ } END { print count + 0 }')"
+    if [[ "$UNMANAGED_CASK_COUNT" -eq 0 ]]; then
+        check_ok "No unmanaged Homebrew casks installed"
+    else
+        check_warn "$UNMANAGED_CASK_COUNT unmanaged Homebrew cask(s) installed"
+        while IFS= read -r cask; do
+            [[ -n "$cask" ]] && echo "   - $cask"
+        done <<< "$UNMANAGED_CASKS"
+    fi
 else
     check_fail "Homebrew not found"
 fi
