@@ -22,6 +22,7 @@ One-time setup. Runs automatically. Manual control when needed.
 | `mm_doctor.sh` | Health checks and diagnostics (`mm doctor`) |
 | `mm_triage.sh` | Quick file/malware triage with hash, VirusTotal and strings (`mm triage`) |
 | `mm_backup_ssh.sh` | Backup `~/.ssh` to an encrypted iCloud sparsebundle (called by `mm maintain`) |
+| `mm_backup_gpg.sh` | Backup GPG keys, ownertrust and `~/.gnupg` to the encrypted iCloud sparsebundle |
 | `mm_common.sh` | Shared configuration and helpers (app list lives here) |
 
 ## How it works
@@ -124,7 +125,7 @@ mm triage <file>  # inspect a suspicious file
 mm help      # show available commands
 ```
 
-`mm maintain` asks before taking optional actions: upgrading outdated Homebrew casks, installing macOS updates, backing up `~/.ssh` to the encrypted iCloud vault, and clearing QuickTime Player's recent documents history. The QuickTime cleanup removes QuickTime's app-specific recent-document shared-file-list entries and legacy QuickTime preference keys. It does not delete media files and does not clear system-wide macOS Recent Items.
+`mm maintain` asks before taking optional actions: upgrading outdated Homebrew casks, installing macOS updates, backing up `~/.ssh` and GPG keys/trust to the encrypted iCloud vault, and clearing QuickTime Player's recent documents history. The QuickTime cleanup removes QuickTime's app-specific recent-document shared-file-list entries and legacy QuickTime preference keys. It does not delete media files and does not clear system-wide macOS Recent Items.
 
 ## File triage
 
@@ -179,14 +180,28 @@ For secrets that should be recoverable on a new Mac but should not live as plain
 
 macOS asks for the vault password each time it needs to be mounted. On the first run it also asks you to choose that password — store it in your password manager. The script never stores or logs the vault password.
 
-Inside the mounted vault, SSH and PEM material have different lifecycles:
+Inside the mounted vault, SSH, GPG and PEM material have different lifecycles:
 
 ```text
 ssh-backup/
+gpg-backup/
 pem-archive/
 ```
 
 `ssh-backup/` is managed by the optional SSH backup prompt in `mm maintain`. It mirrors `~/.ssh` into the encrypted vault and may overwrite that backup on future runs.
+
+`gpg-backup/` is managed by the optional GPG backup prompt in `mm maintain`. It stores `latest/portable/` exports (`public-keys.asc`, `secret-keys.asc`, `ownertrust.txt`, and `secret-keys-list.txt`), `latest/full-gnupg/.gnupg/`, and timestamped archives under `archives/`.
+
+To restore the portable GPG backup on a new Mac:
+
+```bash
+cd "/Volumes/Secrets/gpg-backup/latest/portable"
+gpg --import public-keys.asc
+gpg --import secret-keys.asc
+gpg --import-ownertrust ownertrust.txt
+```
+
+If you need an exact full restore instead, copy `gpg-backup/latest/full-gnupg/.gnupg/` back to `~/.gnupg` while GPG is not running, then restart GPG/GPG Suite.
 
 `pem-archive/` is manual storage for PEM/private-key files that should live only inside the encrypted vault. The SSH backup command creates the folder but never syncs, cleans, or overwrites it.
 

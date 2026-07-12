@@ -14,6 +14,7 @@
 #   - Flushes the DNS cache
 #   - Detects and optionally installs macOS updates
 #   - Optionally backs up ~/.ssh to the encrypted iCloud vault
+#   - Optionally backs up GPG keys/trust to the encrypted iCloud vault
 #   - Optionally clears QuickTime recent documents history
 #
 # Some steps request sudo only when needed.
@@ -152,6 +153,21 @@ if [[ "$confirm_backup" =~ ^[Yy]$ ]]; then
     fi
 else
     log_info "SSH backup skipped"
+fi
+
+# ── GPG backup ───────────────────────
+echo
+echo "── 🔏 GPG backup ─────────────────────────────────"
+
+read -r -p "   Backup GPG keys and trust to encrypted iCloud vault? (y/N): " confirm_gpg_backup
+if [[ "$confirm_gpg_backup" =~ ^[Yy]$ ]]; then
+    if bash "$SCRIPT_DIR/mm_backup_gpg.sh"; then
+        log_ok "GPG backup completed"
+    else
+        log_warn "GPG backup failed"
+    fi
+else
+    log_info "GPG backup skipped"
 fi
 
 clear_quicktime_history() {

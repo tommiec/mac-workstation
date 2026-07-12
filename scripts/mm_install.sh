@@ -56,7 +56,7 @@ echo "── 🚀 Installation started ──"
 COPY_OK=true
 COPY_IDENTICAL=0
 COPY_UPDATED=0
-for f in mm_common.sh mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh mm_backup_ssh.sh; do
+for f in mm_common.sh mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh mm_backup_ssh.sh mm_backup_gpg.sh; do
     SRC="$SRC_DIR/$f"
     DST="$TARGET_DIR/$f"
 
@@ -119,7 +119,7 @@ case "$1" in
   help|"")
     echo "Usage:"
     echo "  mm auto      # automated maintenance"
-    echo "  mm maintain  # run maintenance now (includes SSH backup prompt)"
+    echo "  mm maintain  # run maintenance now (includes SSH/GPG backup prompts)"
     echo "  mm install   # run setup"
     echo "  mm doctor    # check setup health"
     echo "  mm triage    # quick file/malware triage"

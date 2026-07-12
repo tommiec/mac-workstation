@@ -77,7 +77,7 @@ else
     check_fail "Repo scripts folder missing: $REPO_ROOT/scripts"
 fi
 
-for f in mm_common.sh mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh mm_backup_ssh.sh; do
+for f in mm_common.sh mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh mm_backup_ssh.sh mm_backup_gpg.sh; do
     FILE_PATH="$REPO_ROOT/scripts/$f"
     if [[ -f "$FILE_PATH" ]]; then
         check_ok "$f present"
@@ -178,7 +178,7 @@ else
         fi
 
         if [[ "$GITHUB_FETCH_FAILED" -eq 0 ]]; then
-            for f in mm_common.sh mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh mm_backup_ssh.sh; do
+            for f in mm_common.sh mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh mm_backup_ssh.sh mm_backup_gpg.sh; do
                 LOCAL_FILE="$REPO_ROOT/scripts/$f"
                 REMOTE_FILE="$TMP_GITHUB_DIR/$f"
 
@@ -300,6 +300,17 @@ done
 if [[ "$PLAIN_SECRET_FOUND" -eq 0 ]]; then
     check_ok "No plain-text secrets detected in dotfiles"
 fi
+
+# GPG secret-key exports are useful for restore, but should not linger in
+# ordinary folders after they have been moved into the encrypted vault.
+for exported_key in \
+    "$HOME/secret-keys.asc" \
+    "$HOME/Desktop/secret-keys.asc" \
+    "$HOME/Downloads/secret-keys.asc"; do
+    if [[ -f "$exported_key" ]] && grep -q "BEGIN PGP PRIVATE KEY BLOCK" "$exported_key" 2>/dev/null; then
+        check_warn "Plain-text GPG secret key export found: $exported_key; move it to the encrypted vault and delete the local copy"
+    fi
+done
 
 # SSH private keys — existence and hygiene
 if [[ -d "$HOME/.ssh" ]]; then
@@ -429,7 +440,7 @@ fi
 
 echo
 echo "── 🧾 Last script runs ───────────────────────────"
-for script in mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh mm_backup_ssh.sh; do
+for script in mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh mm_backup_ssh.sh mm_backup_gpg.sh; do
     STATUS_FILE="$SCRIPT_STATUS_DIR/$script.status"
 
     if [[ ! -f "$STATUS_FILE" ]]; then
