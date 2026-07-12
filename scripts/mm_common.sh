@@ -23,6 +23,7 @@ LOG_DIR="$HOME/Library/Logs/mac_manager"
 SCRIPT_STATUS_DIR="$LOG_DIR/status"
 REPO_ROOT="$HOME/Repositories/dev/mac-workstation"
 CONFIGS_DIR="$REPO_ROOT/configs"
+GIT_HOOKS_DIR="$CONFIGS_DIR/git-hooks"
 SCRIPTS_ROOT="$HOME/Scripts"
 SYMLINK_PATH="$SCRIPTS_ROOT/mac-workstation"
 BIN_DIR="$SCRIPTS_ROOT/bin"
@@ -238,8 +239,9 @@ keychain_set() {
 }
 
 # ── Git global configuration ────────────────────────────
-# Installs configs/git-ignore-global as ~/.config/git/ignore and sets
-# core.excludesFile so all repos on this machine inherit the exclude rules.
+# Installs configs/git-ignore-global as ~/.config/git/ignore, sets
+# core.excludesFile and installs global Git hooks so all repos on this machine
+# inherit the same hygiene checks.
 
 setup_git_global() {
     local git_config_dir="$HOME/.config/git"
@@ -254,6 +256,13 @@ setup_git_global() {
     mkdir -p "$git_config_dir"
     cp "$src" "$dst" || return 1
     git config --global core.excludesFile "$dst" || return 1
+
+    if [[ ! -x "$GIT_HOOKS_DIR/commit-msg" ]]; then
+        echo "configs/git-hooks/commit-msg not found or not executable" >&2
+        return 1
+    fi
+
+    git config --global core.hooksPath "$GIT_HOOKS_DIR" || return 1
 }
 
 # ── Homebrew ────────────────────────────────────────────
