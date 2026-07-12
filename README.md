@@ -54,7 +54,7 @@ The installer will:
 - install all apps from `MANAGED_CASKS` and `CLI_TOOLS` in `mm_common.sh`
 - create the symlink under `~/Scripts/mac-workstation`
 - install the `mm` command in `~/Scripts/bin`
-- configure global Git excludes and commit-message hygiene hooks
+- configure global Git excludes and a local Git hooks path
 - register the weekly launchd job
 
 To update later:
@@ -75,6 +75,39 @@ bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-workstation/scr
 ```
 
 Useful on a new Mac before Git is configured. The installer copies scripts from wherever you run `mm_install.sh` from, so both the repo and the iCloud copy work as a source.
+
+### Local Git config bootstrap
+
+`mm install` configures the machine-wide Git hygiene baseline:
+
+- `configs/git-ignore-global` is copied to `~/.config/git/ignore`
+- Git is configured with `core.excludesFile=~/.config/git/ignore`
+- Git is configured with `core.hooksPath=~/.config/git/hooks`
+
+That baseline is intentionally small and public-safe. It keeps local workspace
+files out of Git, but it does not store personal hook logic or detailed local
+ignore rules in this repository.
+
+For private machine-specific Git rules, `mm install` also looks for an optional
+iCloud overlay:
+
+```text
+~/Library/Mobile Documents/com~apple~CloudDocs/Scripts/git/
+  ignore.local
+  hooks/
+```
+
+When present:
+
+- `ignore.local` is copied to `~/.config/git/ignore.local`
+- files in `hooks/` are copied to `~/.config/git/hooks/`
+- hook files are made executable
+- `ignore.local` is appended to the generated `~/.config/git/ignore`
+
+This keeps private commit-message checks, personal tooling excludes, and other
+machine-local Git hygiene recoverable after a reinstall without storing their
+contents in this public repo. `mm doctor` verifies that the global exclude file,
+hooks path, optional iCloud source, and local `commit-msg` hook are present.
 
 ## Usage
 
@@ -165,9 +198,9 @@ Unmount the vault after use and let iCloud Drive finish syncing before shutting 
 - Writes logs and last-run status under `~/Library/Logs/mac_manager/`
 - Safe to re-run `mm install` at any time, but usually only needed after installer-managed setup changes
 - `mm doctor` can be used to validate the setup and inspect the last recorded run for each script
-- Global Git hygiene is installed by `mm install`: `AGENTS.md` stays local-only
-  through the global exclude file, and the global `commit-msg` hook blocks
-  assistant/tool names and generated co-author trailers in commit messages.
+- Global Git hygiene is installed by `mm install`: shared excludes come from
+  this repo, while machine-local excludes and hooks live under `~/.config/git`
+  and are not stored here.
 
 ## License
 

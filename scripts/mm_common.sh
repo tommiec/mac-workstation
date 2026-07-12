@@ -23,7 +23,8 @@ LOG_DIR="$HOME/Library/Logs/mac_manager"
 SCRIPT_STATUS_DIR="$LOG_DIR/status"
 REPO_ROOT="$HOME/Repositories/dev/mac-workstation"
 CONFIGS_DIR="$REPO_ROOT/configs"
-GIT_HOOKS_DIR="$CONFIGS_DIR/git-hooks"
+LOCAL_GIT_HOOKS_DIR="$HOME/.config/git/hooks"
+LOCAL_GIT_EXCLUDES="$HOME/.config/git/ignore.local"
 SCRIPTS_ROOT="$HOME/Scripts"
 SYMLINK_PATH="$SCRIPTS_ROOT/mac-workstation"
 BIN_DIR="$SCRIPTS_ROOT/bin"
@@ -31,6 +32,7 @@ MM_PATH="$BIN_DIR/mm"
 ICLOUD_SCRIPTS_ROOT="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Scripts"
 ICLOUD_BOOTSTRAP_ROOT="$ICLOUD_SCRIPTS_ROOT/mac-workstation"
 ICLOUD_BOOTSTRAP_DIR="$ICLOUD_BOOTSTRAP_ROOT/scripts"
+ICLOUD_GIT_CONFIG_ROOT="$ICLOUD_SCRIPTS_ROOT/git"
 
 LAUNCH_AGENT_LABEL="local.mac-manager.auto-maintenance"
 LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LAUNCH_AGENT_LABEL}.plist"
@@ -239,9 +241,31 @@ keychain_set() {
 }
 
 # ── Git global configuration ────────────────────────────
-# Installs configs/git-ignore-global as ~/.config/git/ignore, sets
-# core.excludesFile and installs global Git hooks so all repos on this machine
-# inherit the same hygiene checks.
+# Installs configs/git-ignore-global as ~/.config/git/ignore and sets
+# core.excludesFile so all repos on this machine inherit the exclude rules.
+# Optional machine-local additions live in ~/.config/git/ignore.local and
+# optional hooks live in ~/.config/git/hooks; their contents are not stored in
+# this public repository.
+
+sync_local_git_config_from_icloud() {
+    local hooks_src="$ICLOUD_GIT_CONFIG_ROOT/hooks"
+    local hooks_dst="$LOCAL_GIT_HOOKS_DIR"
+
+    [[ -d "$ICLOUD_GIT_CONFIG_ROOT" ]] || return 0
+
+    mkdir -p "$(dirname "$LOCAL_GIT_EXCLUDES")" "$hooks_dst" || return 1
+
+    if [[ -f "$ICLOUD_GIT_CONFIG_ROOT/ignore.local" ]]; then
+        cp "$ICLOUD_GIT_CONFIG_ROOT/ignore.local" "$LOCAL_GIT_EXCLUDES" || return 1
+    fi
+
+    if [[ -d "$hooks_src" ]]; then
+        while IFS= read -r hook_file; do
+            cp "$hook_file" "$hooks_dst/$(basename "$hook_file")" || return 1
+            chmod u+x "$hooks_dst/$(basename "$hook_file")" || return 1
+        done < <(find "$hooks_src" -maxdepth 1 -type f -print)
+    fi
+}
 
 setup_git_global() {
     local git_config_dir="$HOME/.config/git"
@@ -254,15 +278,20 @@ setup_git_global() {
     fi
 
     mkdir -p "$git_config_dir"
+    sync_local_git_config_from_icloud || return 1
+
     cp "$src" "$dst" || return 1
+    if [[ -f "$LOCAL_GIT_EXCLUDES" ]]; then
+        {
+            echo ""
+            echo "# Local-only additions"
+            cat "$LOCAL_GIT_EXCLUDES"
+        } >> "$dst" || return 1
+    fi
     git config --global core.excludesFile "$dst" || return 1
 
-    if [[ ! -x "$GIT_HOOKS_DIR/commit-msg" ]]; then
-        echo "configs/git-hooks/commit-msg not found or not executable" >&2
-        return 1
-    fi
-
-    git config --global core.hooksPath "$GIT_HOOKS_DIR" || return 1
+    mkdir -p "$LOCAL_GIT_HOOKS_DIR" || return 1
+    git config --global core.hooksPath "$LOCAL_GIT_HOOKS_DIR" || return 1
 }
 
 # ── Homebrew ────────────────────────────────────────────
