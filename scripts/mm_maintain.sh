@@ -62,13 +62,23 @@ fi
 
 run_step "brew update" brew update
 
-# Visibility on drift: anything installed outside the Brewfile.
+# Visibility on drift, so keep/uninstall/promote-to-Brewfile stays a
+# deliberate choice: brew packages outside the Brewfile, plus apps in
+# /Applications that did not come in through Homebrew at all.
 UNMANAGED="$(list_unmanaged_packages)"
 if [[ -z "$UNMANAGED" ]]; then
     log_ok "No packages installed outside the Brewfile"
 else
-    log_warn "Packages installed outside the Brewfile:"
+    log_warn "Packages installed outside the Brewfile — add to the Brewfile or uninstall:"
     echo "$UNMANAGED" | sed 's/^/      /'
+fi
+
+UNMANAGED_APPS="$(list_unmanaged_apps)"
+if [[ -z "$UNMANAGED_APPS" ]]; then
+    log_ok "All apps in /Applications are Homebrew-managed"
+else
+    log_warn "Apps in /Applications not managed by Homebrew:"
+    echo "$UNMANAGED_APPS" | sed 's/^/      /'
 fi
 
 OUTDATED_CASKS_RAW="$(brew outdated --cask --quiet 2>/dev/null || true)"
