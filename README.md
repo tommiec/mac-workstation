@@ -16,7 +16,7 @@ One-time setup. Runs automatically. Manual control when needed.
 
 | Script | Purpose |
 |---|---|
-| `mm_install.sh` | Bootstrap setup (repo, symlink, CLI, launchd) |
+| `mm_install.sh` | Bootstrap setup (repo, CLI, launchd) |
 | `mm_auto.sh` | Automated weekly maintenance (launchd) |
 | `mm_maintain.sh` | Run maintenance now: Homebrew, optional cask upgrades, DNS flush, macOS updates, optional SSH backup, optional QuickTime history cleanup |
 | `mm_doctor.sh` | Health checks and diagnostics (`mm doctor`) |
@@ -27,36 +27,44 @@ One-time setup. Runs automatically. Manual control when needed.
 
 ## How it works
 
-Scripts are managed using a **repo + symlink + CLI model**:
+Scripts are managed using a **repo + CLI model**:
 
 ```
-~/Repositories/dev/mac-workstation          → source of truth (git repo)
-~/Scripts/mac-workstation               → symlink to repo
-~/Scripts/bin/mm                        → CLI entrypoint
+~/Repositories/dev/mac-workstation      → source and runtime (git repo)
+~/.local/bin/mm                         → CLI entrypoint
 ~/Library/Logs/mac_manager/             → logs
 ```
 
-- The repo contains all scripts and is version-controlled
-- A symlink provides a stable runtime path
+- The repo contains the runtime scripts and is version-controlled
 - The `mm` command provides a simple interface
-- launchd runs the auto-maintenance script from the symlinked location
+- launchd runs the auto-maintenance script directly from the repository
 
 ## Installation
 
 Clone the repo and run the installer once:
 
 ```bash
+mkdir -p ~/Repositories/dev
 git clone https://github.com/tommiec/mac-workstation.git ~/Repositories/dev/mac-workstation
 bash ~/Repositories/dev/mac-workstation/scripts/mm_install.sh
 ```
 
+If `git` is not available yet, run `xcode-select --install`, complete the
+Command Line Tools installation, and then repeat the commands above.
+
 The installer will:
 - set up Homebrew (if needed)
 - install all apps from `MANAGED_CASKS` and `CLI_TOOLS` in `mm_common.sh`
-- create the symlink under `~/Scripts/mac-workstation`
-- install the `mm` command in `~/Scripts/bin`
+- install the `mm` command in `~/.local/bin`
 - configure global Git excludes and a local Git hooks path
 - register the weekly launchd job
+
+The installer ensures that the user-local command folder is in your shell path
+by adding this line to `~/.zshrc` when it is not already present:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
 
 To update later:
 
@@ -65,17 +73,7 @@ cd ~/Repositories/dev/mac-workstation
 git pull --ff-only
 ```
 
-Normal script changes are active after `git pull` because `~/Scripts/mac-workstation` is a symlink to the repo. Run `mm install` only if you changed installer-managed setup: the app list, LaunchAgent schedule, or `mm` wrapper.
-
-### iCloud bootstrap
-
-If you already have a synced copy in iCloud Drive (my personal fallback), you can run the installer from there instead:
-
-```bash
-bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-workstation/scripts/mm_install.sh
-```
-
-Useful on a new Mac before Git is configured. The installer copies scripts from wherever you run `mm_install.sh` from, so both the repo and the iCloud copy work as a source.
+Normal script changes are active directly after `git pull`. Run `mm install` only if you changed installer-managed setup: the app list, LaunchAgent schedule, or `mm` wrapper.
 
 ### Local Git config bootstrap
 
@@ -85,30 +83,25 @@ Useful on a new Mac before Git is configured. The installer copies scripts from 
 - Git is configured with `core.excludesFile=~/.config/git/ignore`
 - Git is configured with `core.hooksPath=~/.config/git/hooks`
 
-That baseline is intentionally small and public-safe. It keeps local workspace
-files out of Git, but it does not store personal hook logic or detailed local
-ignore rules in this repository.
-
-For private machine-specific Git rules, `mm install` also looks for an optional
-iCloud overlay:
+The repository also contains the managed local ignore rules and commit-message
+hook:
 
 ```text
-~/Library/Mobile Documents/com~apple~CloudDocs/Scripts/git/
+configs/
   ignore.local
   hooks/
+    commit-msg
 ```
 
-When present:
+During installation:
 
 - `ignore.local` is copied to `~/.config/git/ignore.local`
-- files in `hooks/` are copied to `~/.config/git/hooks/`
-- hook files are made executable
+- `commit-msg` is copied to `~/.config/git/hooks/commit-msg` and made executable
 - `ignore.local` is appended to the generated `~/.config/git/ignore`
 
-This keeps private commit-message checks, personal tooling excludes, and other
-machine-local Git hygiene recoverable after a reinstall without storing their
-contents in this public repo. `mm doctor` verifies that the global exclude file,
-hooks path, optional iCloud source, and local `commit-msg` hook are present.
+This keeps all Git hygiene configuration versioned and reproducible from the
+same source. `mm doctor` verifies that the installed local excludes and
+`commit-msg` hook match the repository versions.
 
 ## Usage
 
@@ -155,7 +148,7 @@ Avoid storing API keys and tokens as plain text in dotfiles. On macOS, Keychain 
 For one-off Keychain use, source the helper file first:
 
 ```bash
-source ~/Scripts/mac-workstation/scripts/mm_common.sh
+source ~/Repositories/dev/mac-workstation/scripts/mm_common.sh
 keychain_set "ANTHROPIC_API_KEY"   # store once; prompts for the secret
 keychain_get "ANTHROPIC_API_KEY"   # retrieve
 ```

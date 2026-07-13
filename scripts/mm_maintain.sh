@@ -6,7 +6,7 @@
 # Usage (after installation):
 #   mm maintain
 #   or
-#   bash ~/Scripts/mac-workstation/scripts/mm_maintain.sh
+#   bash ~/Repositories/dev/mac-workstation/scripts/mm_maintain.sh
 #
 # What this script does:
 #   - Runs brew doctor
@@ -77,14 +77,27 @@ else
 
     if [[ "$confirm_casks" =~ ^[Yy]$ ]]; then
         OUTDATED_CASKS=()
+        CASK_UPGRADED=0
+        CASK_FAILED=0
+        CASK_FAILED_NAMES=""
         while IFS= read -r cask; do
             [[ -n "$cask" ]] && OUTDATED_CASKS+=("$cask")
         done <<< "$OUTDATED_CASKS_RAW"
 
-        if brew upgrade --cask "${OUTDATED_CASKS[@]}"; then
-            log_ok "Homebrew casks upgraded"
+        for cask in "${OUTDATED_CASKS[@]}"; do
+            echo "   Upgrading cask: $cask"
+            if brew upgrade --cask "$cask"; then
+                CASK_UPGRADED=$((CASK_UPGRADED + 1))
+            else
+                CASK_FAILED=$((CASK_FAILED + 1))
+                CASK_FAILED_NAMES="${CASK_FAILED_NAMES:+$CASK_FAILED_NAMES, }$cask"
+            fi
+        done
+
+        if [[ "$CASK_FAILED" -eq 0 ]]; then
+            log_ok "Homebrew casks upgraded ($CASK_UPGRADED)"
         else
-            log_warn "Homebrew cask upgrade failed"
+            log_warn "Homebrew casks: $CASK_UPGRADED upgraded, $CASK_FAILED failed ($CASK_FAILED_NAMES)"
         fi
     else
         log_info "Homebrew cask upgrades skipped"

@@ -4,21 +4,14 @@
 # Bootstrap setup script — installs apps and configures Mac Manager automation
 #
 # Usage (once on a new Mac):
-#   GitHub:
-#     bash ~/Repositories/dev/mac-workstation/scripts/mm_install.sh
-#   iCloud Drive:
-#     bash ~/Library/Mobile\ Documents/com~apple~CloudDocs/Scripts/mac-workstation/scripts/mm_install.sh
+#   bash ~/Repositories/dev/mac-workstation/scripts/mm_install.sh
 #
 # What this script does:
-#   1. Copies the Mac Manager scripts to:
-#        ~/Repositories/dev/mac-workstation/scripts
-#   2. Creates a symlink:
-#        ~/Scripts/mac-workstation -> ~/Repositories/dev/mac-workstation
-#   3. Creates a command wrapper:
-#        ~/Scripts/bin/mm
-#   4. Installs Homebrew if needed
-#   5. Installs all apps from MANAGED_CASKS and CLI_TOOLS
-#   6. Registers mm_auto.sh as a weekly launchd agent
+#   1. Creates a command wrapper:
+#        ~/.local/bin/mm
+#   2. Installs Homebrew if needed
+#   3. Installs all apps from MANAGED_CASKS and CLI_TOOLS
+#   4. Registers mm_auto.sh as a weekly launchd agent
 #        (every Saturday at 02:00)
 #
 # After installation:
@@ -31,90 +24,50 @@
 set -o pipefail
 set -u
 
-# SRC_DIR = location of this script (for example iCloud Drive on first run)
-SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 REPO_ROOT="$HOME/Repositories/dev/mac-workstation"
-TARGET_DIR="$REPO_ROOT/scripts"
-SCRIPTS_ROOT="$HOME/Scripts"
-SYMLINK_PATH="$SCRIPTS_ROOT/mac-workstation"
-LEGACY_SYMLINK_PATH="$SCRIPTS_ROOT/mac-maintenance"
-BIN_DIR="$SCRIPTS_ROOT/bin"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BIN_DIR="$HOME/.local/bin"
 MM_PATH="$BIN_DIR/mm"
-
-mkdir -p "$REPO_ROOT"
-mkdir -p "$TARGET_DIR"
-mkdir -p "$BIN_DIR"
+ZSHRC_PATH="$HOME/.zshrc"
 
 echo "── 🚀 Installation started ──"
 
-# ── Copy scripts to install location ─────────────────────
-# Copies are summarized so repeat installs stay readable.
-# mm_install.sh intentionally copies itself, so 'mm install'
-# always runs the latest installed version.
-
-COPY_OK=true
-COPY_IDENTICAL=0
-COPY_UPDATED=0
-for f in mm_common.sh mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh mm_backup_ssh.sh mm_backup_gpg.sh; do
-    SRC="$SRC_DIR/$f"
-    DST="$TARGET_DIR/$f"
-
-    if cmp -s "$SRC" "$DST" 2>/dev/null; then
-        COPY_IDENTICAL=$((COPY_IDENTICAL + 1))
-    elif cp "$SRC" "$DST"; then
-        COPY_UPDATED=$((COPY_UPDATED + 1))
-    else
-        echo "   ❌ failed to copy $f"
-        COPY_OK=false
-    fi
-done
-
-if [[ "$COPY_OK" == false ]]; then
-    echo "❌ Not all scripts could be copied. Installation aborted."
+if [[ "$SCRIPT_DIR" != "$REPO_ROOT/scripts" || ! -d "$REPO_ROOT/.git" ]]; then
+    echo "❌ Run this installer from the canonical Git checkout:"
+    echo "   $REPO_ROOT/scripts/mm_install.sh"
     exit 1
 fi
 
-chmod +x "$TARGET_DIR"/*.sh
-if [[ "$COPY_UPDATED" -eq 0 ]]; then
-    echo "   ✅ Scripts unchanged ($COPY_IDENTICAL checked)"
-else
-    echo "   ✅ Scripts updated ($COPY_UPDATED copied, $COPY_IDENTICAL unchanged)"
-fi
-
-# ── Symlink to ~/Scripts/mac-workstation ─────────────────
-
-if [[ -L "$LEGACY_SYMLINK_PATH" ]]; then
-    rm -f "$LEGACY_SYMLINK_PATH"
-fi
-
-ln -sfn "$REPO_ROOT" "$SYMLINK_PATH"
+mkdir -p "$BIN_DIR"
+chmod +x "$SCRIPT_DIR"/*.sh
 
 # ── Create mm command wrapper ────────────────────────────
 
 cat > "$MM_PATH" <<'EOF'
 #!/bin/zsh
 
+MM_SCRIPTS_DIR="$HOME/Repositories/dev/mac-workstation/scripts"
+
 case "$1" in
   auto)
     shift
-    "$HOME/Scripts/mac-workstation/scripts/mm_auto.sh" "$@"
+    "$MM_SCRIPTS_DIR/mm_auto.sh" "$@"
     ;;
   maintain)
     shift
-    "$HOME/Scripts/mac-workstation/scripts/mm_maintain.sh" "$@"
+    "$MM_SCRIPTS_DIR/mm_maintain.sh" "$@"
     ;;
   install)
     shift
-    "$HOME/Scripts/mac-workstation/scripts/mm_install.sh" "$@"
+    "$MM_SCRIPTS_DIR/mm_install.sh" "$@"
     ;;
   doctor)
     shift
-    "$HOME/Scripts/mac-workstation/scripts/mm_doctor.sh" "$@"
+    "$MM_SCRIPTS_DIR/mm_doctor.sh" "$@"
     ;;
   triage)
     shift
-    "$HOME/Scripts/mac-workstation/scripts/mm_triage.sh" "$@"
+    "$MM_SCRIPTS_DIR/mm_triage.sh" "$@"
     ;;
   help|"")
     echo "Usage:"
@@ -135,10 +88,8 @@ EOF
 chmod +x "$MM_PATH"
 
 # ── Load shared functions and config ─────────────────────
-# From here on, everything runs from the repo location (TARGET_DIR).
-# SCRIPTS_DIR in mm_common.sh then points to TARGET_DIR correctly.
 
-source "$TARGET_DIR/mm_common.sh"
+source "$SCRIPT_DIR/mm_common.sh"
 mkdir -p "$LOG_DIR"
 trap 'record_script_result "mm_install.sh" "$?"' EXIT
 
@@ -157,6 +108,26 @@ run_step "brew update" brew update
 echo
 echo "── ⚙️  Configuration ─────────────────────────────"
 
+setup_mm_command_path() {
+    # Literal line written to ~/.zshrc; expansion must happen in future shells.
+    # shellcheck disable=SC2016
+    local path_line='export PATH="$HOME/.local/bin:$PATH"'
+
+    touch "$ZSHRC_PATH" || return 1
+    if ! grep -Fqx "$path_line" "$ZSHRC_PATH"; then
+        if [[ -s "$ZSHRC_PATH" ]]; then
+            echo "" >> "$ZSHRC_PATH" || return 1
+        fi
+        {
+            echo "# Mac Manager CLI"
+            echo "$path_line"
+        } >> "$ZSHRC_PATH" || return 1
+    fi
+
+    export PATH="$BIN_DIR:$PATH"
+}
+
+run_step "mm command PATH setup" setup_mm_command_path
 run_step "git global exclude setup" setup_git_global
 
 # ── Install apps ─────────────────────
@@ -228,21 +199,18 @@ else
     log_warn "Failed to load LaunchAgent"
 fi
 
-# ── iCloud bootstrap copy ───────────
-sync_scripts_to_icloud
-
 # ── Summary ──────────────────────────
 
 summary_print
 
 echo
 echo "── 📁 Installation paths ─────────────────────────"
-log_ok "Scripts: $TARGET_DIR"
-log_ok "Symlink: $SYMLINK_PATH"
+log_ok "Scripts: $SCRIPT_DIR"
 log_ok "Command: $MM_PATH"
 
-if ! echo "$PATH" | tr ':' '\n' | grep -Fxq "$HOME/Scripts/bin"; then
+if ! echo "$PATH" | tr ':' '\n' | grep -Fxq "$BIN_DIR"; then
     echo ""
-    log_warn "Make sure ~/Scripts/bin is in your PATH (for example in ~/.zshrc or ~/.bash_profile):"
-    echo '         export PATH="$HOME/Scripts/bin:$PATH"'
+    log_warn "Make sure ~/.local/bin is in your PATH (for example in ~/.zshrc or ~/.bash_profile):"
+    # shellcheck disable=SC2016
+    echo '         export PATH="$HOME/.local/bin:$PATH"'
 fi

@@ -6,12 +6,11 @@
 # Do not run directly — sourced by the other scripts.
 #
 # Setup model:
-#   Source of truth: ~/Repositories/dev/mac-workstation  (git repo)
-#   Runtime path:    ~/Scripts/mac-workstation            (symlink to repo)
-#   CLI entrypoint:  ~/Scripts/bin/mm
+#   Source/runtime:  ~/Repositories/dev/mac-workstation  (git repo)
+#   CLI entrypoint:  ~/.local/bin/mm
 #
-# iCloud Drive copy is a personal bootstrap fallback for new Macs.
-# GitHub remains the canonical source.
+# GitHub is the canonical source. iCloud Drive is used only for encrypted
+# backups.
 # =========================================================
 
 # ── Config ──────────────────────────────────────────────
@@ -25,14 +24,17 @@ REPO_ROOT="$HOME/Repositories/dev/mac-workstation"
 CONFIGS_DIR="$REPO_ROOT/configs"
 LOCAL_GIT_HOOKS_DIR="$HOME/.config/git/hooks"
 LOCAL_GIT_EXCLUDES="$HOME/.config/git/ignore.local"
-SCRIPTS_ROOT="$HOME/Scripts"
-SYMLINK_PATH="$SCRIPTS_ROOT/mac-workstation"
-BIN_DIR="$SCRIPTS_ROOT/bin"
+BIN_DIR="$HOME/.local/bin"
 MM_PATH="$BIN_DIR/mm"
-ICLOUD_SCRIPTS_ROOT="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Scripts"
-ICLOUD_BOOTSTRAP_ROOT="$ICLOUD_SCRIPTS_ROOT/mac-workstation"
-ICLOUD_BOOTSTRAP_DIR="$ICLOUD_BOOTSTRAP_ROOT/scripts"
-ICLOUD_GIT_CONFIG_ROOT="$ICLOUD_SCRIPTS_ROOT/git"
+
+# Interactive shells usually learn this through brew shellenv. launchd does
+# not read shell profiles, so make the standard Homebrew locations available
+# to every Mac Manager script as soon as this shared file is sourced.
+if [[ -x /opt/homebrew/bin/brew ]]; then
+    export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
+elif [[ -x /usr/local/bin/brew ]]; then
+    export PATH="/usr/local/bin:/usr/local/sbin:$PATH"
+fi
 
 LAUNCH_AGENT_LABEL="local.mac-manager.auto-maintenance"
 LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LAUNCH_AGENT_LABEL}.plist"
@@ -73,7 +75,6 @@ MANAGED_CASKS=(
   # System utilities
   appcleaner
   monitorcontrol
-  onyx
   rectangle
   utm
 
@@ -243,28 +244,24 @@ keychain_set() {
 # ── Git global configuration ────────────────────────────
 # Installs configs/git-ignore-global as ~/.config/git/ignore and sets
 # core.excludesFile so all repos on this machine inherit the exclude rules.
-# Optional machine-local additions live in ~/.config/git/ignore.local and
-# optional hooks live in ~/.config/git/hooks; their contents are not stored in
-# this public repository.
+# Additional ignore rules and managed hooks are stored in this repository and
+# installed into ~/.config/git.
 
-sync_local_git_config_from_icloud() {
-    local hooks_src="$ICLOUD_GIT_CONFIG_ROOT/hooks"
+install_managed_git_config() {
+    local excludes_src="$CONFIGS_DIR/ignore.local"
+    local hooks_src="$CONFIGS_DIR/hooks"
     local hooks_dst="$LOCAL_GIT_HOOKS_DIR"
 
-    [[ -d "$ICLOUD_GIT_CONFIG_ROOT" ]] || return 0
+    [[ -f "$excludes_src" ]] || return 1
+    [[ -d "$hooks_src" ]] || return 1
 
     mkdir -p "$(dirname "$LOCAL_GIT_EXCLUDES")" "$hooks_dst" || return 1
+    cp "$excludes_src" "$LOCAL_GIT_EXCLUDES" || return 1
 
-    if [[ -f "$ICLOUD_GIT_CONFIG_ROOT/ignore.local" ]]; then
-        cp "$ICLOUD_GIT_CONFIG_ROOT/ignore.local" "$LOCAL_GIT_EXCLUDES" || return 1
-    fi
-
-    if [[ -d "$hooks_src" ]]; then
-        while IFS= read -r hook_file; do
-            cp "$hook_file" "$hooks_dst/$(basename "$hook_file")" || return 1
-            chmod u+x "$hooks_dst/$(basename "$hook_file")" || return 1
-        done < <(find "$hooks_src" -maxdepth 1 -type f -print)
-    fi
+    while IFS= read -r hook_file; do
+        cp "$hook_file" "$hooks_dst/$(basename "$hook_file")" || return 1
+        chmod u+x "$hooks_dst/$(basename "$hook_file")" || return 1
+    done < <(find "$hooks_src" -maxdepth 1 -type f -print)
 }
 
 setup_git_global() {
@@ -278,7 +275,7 @@ setup_git_global() {
     fi
 
     mkdir -p "$git_config_dir"
-    sync_local_git_config_from_icloud || return 1
+    install_managed_git_config || return 1
 
     cp "$src" "$dst" || return 1
     if [[ -f "$LOCAL_GIT_EXCLUDES" ]]; then
@@ -302,7 +299,22 @@ ensure_brew() {
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
             || return 1
     fi
-    return 0
+
+    # Homebrew's installer updates future login shells, but it cannot update
+    # this already-running process. Load the detected installation explicitly.
+    local brew_bin=""
+    if command -v brew &>/dev/null; then
+        brew_bin="$(command -v brew)"
+    elif [[ -x /opt/homebrew/bin/brew ]]; then
+        brew_bin="/opt/homebrew/bin/brew"
+    elif [[ -x /usr/local/bin/brew ]]; then
+        brew_bin="/usr/local/bin/brew"
+    else
+        return 1
+    fi
+
+    eval "$("$brew_bin" shellenv)" || return 1
+    command -v brew &>/dev/null
 }
 
 # ── LaunchAgent ─────────────────────────────────────────
@@ -353,22 +365,6 @@ load_auto_launch_agent() {
     if /bin/launchctl print "gui/$(id -u)/$LAUNCH_AGENT_LABEL" >/dev/null 2>&1; then
         return 0
     else
-        return 1
-    fi
-}
-
-sync_scripts_to_icloud() {
-    if [[ ! -d "$ICLOUD_SCRIPTS_ROOT" ]]; then
-        log_warn "iCloud Scripts folder not found, skipping sync"
-        return 0
-    fi
-
-    mkdir -p "$ICLOUD_BOOTSTRAP_DIR"
-
-    if rsync -av --delete "$SCRIPTS_DIR/" "$ICLOUD_BOOTSTRAP_DIR/" >/dev/null 2>&1; then
-        log_ok "iCloud bootstrap copy updated"
-    else
-        log_warn "Failed to update iCloud bootstrap copy"
         return 1
     fi
 }

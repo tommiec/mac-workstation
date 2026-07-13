@@ -1,0 +1,31 @@
+#!/bin/sh
+# Local-only commit message hygiene hook.
+
+msg_file="$1"
+
+if [ -z "$msg_file" ] || [ ! -f "$msg_file" ]; then
+    exit 0
+fi
+
+blocked_trailer_re='^(Co-authored-by|Co-Authored-By|Generated-by|Generated-By|Created-by|Created-By|Assisted-by|Assisted-By|Pair-programmed-with|Pair-Programmed-With):.*(AI|Bot|Assistant|Agent|Claude|Codex|OpenAI|Anthropic|Gemini|GPT|LLM|Copilot|Aider|Cline|Cursor|Windsurf|Continue|Roo|OpenHands)'
+blocked_tool_re='(Claude|Claude Code|Codex|ChatGPT|OpenAI|Anthropic|Gemini|GitHub Copilot|Aider|Cline|Cursor|Windsurf|Roo Code|OpenHands)'
+
+if grep -Eiq "$blocked_trailer_re" "$msg_file"; then
+    cat >&2 <<'EOF'
+Commit blocked: generated assistant/tool trailer detected.
+
+Remove generated co-author or assistant trailers before committing.
+EOF
+    exit 1
+fi
+
+if grep -Eiq "$blocked_tool_re" "$msg_file"; then
+    cat >&2 <<'EOF'
+Commit blocked: assistant/tool name detected in the commit message.
+
+Write the commit message in normal project terms: what changed and why.
+EOF
+    exit 1
+fi
+
+exit 0
