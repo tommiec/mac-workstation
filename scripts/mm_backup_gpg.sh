@@ -133,8 +133,8 @@ fi
 
 echo "Copying ~/.gnupg..."
 mkdir -p "$FULL_DIR/.gnupg"
-if ! rsync -a --delete \
-    --exclude 'S.gpg-agent*' \
+if ! rsync -rltpgo --delete \
+    --exclude 'S.*' \
     --exclude '*.lock' \
     "$GPG_SOURCE/" "$FULL_DIR/.gnupg/"; then
     echo "❌ Could not copy GPG home folder"
@@ -148,7 +148,7 @@ vault=$VAULT_PATH
 secret_key_count=$SECRET_KEY_COUNT
 portable_exports=public-keys.asc, secret-keys.asc, ownertrust.txt, secret-keys-list.txt
 full_copy=full-gnupg/.gnupg
-excluded=S.gpg-agent*, *.lock
+excluded=S.*, *.lock
 restore_public=gpg --import public-keys.asc
 restore_secret=gpg --import secret-keys.asc
 restore_ownertrust=gpg --import-ownertrust ownertrust.txt

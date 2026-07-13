@@ -1,0 +1,28 @@
+# Local tool settings
+**/.claude/settings.local.json
+
+# Local agent/assistant files
+CLAUDE.md
+GEMINI.md
+COPILOT.md
+
+# Local tool workspaces
+.cursor/
+.cursorignore
+.cursorrules
+.aider*
+.continue/
+.roo/
+.windsurf/
+.codex/
+.openhands/
+.clineresults
+
+# Local prompt/context dirs
+.ai/
+.ai-context/
+.llm/
+.llms/
+.instructions/
+.prompts/
+.github/copilot-instructions.md

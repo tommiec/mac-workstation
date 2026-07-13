@@ -35,12 +35,12 @@ echo
 
 # ── PATH ────────────────────────────────────────────────
 
-if echo "$PATH" | tr ':' '\n' | grep -Fxq "$HOME/Scripts/bin"; then
-    check_ok "PATH contains ~/Scripts/bin"
+if echo "$PATH" | tr ':' '\n' | grep -Fxq "$BIN_DIR"; then
+    check_ok "PATH contains ~/.local/bin"
 else
-    check_fail "PATH does not contain ~/Scripts/bin"
+    check_fail "PATH does not contain ~/.local/bin"
     # shellcheck disable=SC2016
-    echo '   Add this to ~/.zshrc: export PATH="$HOME/Scripts/bin:$PATH"'
+    echo '   Add this to ~/.zshrc: export PATH="$HOME/.local/bin:$PATH"'
 fi
 
 if command -v mm >/dev/null 2>&1; then
@@ -52,21 +52,6 @@ if command -v mm >/dev/null 2>&1; then
     fi
 else
     check_fail "mm not found in PATH"
-fi
-
-# ── Symlink ─────────────────────────────────────────────
-
-if [[ -L "$SYMLINK_PATH" ]]; then
-    TARGET="$(readlink "$SYMLINK_PATH")"
-    if [[ "$TARGET" == "$REPO_ROOT" ]]; then
-        check_ok "Symlink correct: $SYMLINK_PATH -> $TARGET"
-    else
-        check_fail "Symlink points to the wrong target: $SYMLINK_PATH -> $TARGET"
-    fi
-elif [[ -e "$SYMLINK_PATH" ]]; then
-    check_fail "$SYMLINK_PATH exists, but is not a symlink"
-else
-    check_fail "Symlink missing: $SYMLINK_PATH"
 fi
 
 # ── Repo / scripts ──────────────────────────────────────
@@ -127,18 +112,22 @@ else
 fi
 
 if [[ -x "$LOCAL_GIT_HOOKS_DIR/commit-msg" ]]; then
-    check_ok "Local commit-msg hook present and executable"
+    if cmp -s "$CONFIGS_DIR/hooks/commit-msg" "$LOCAL_GIT_HOOKS_DIR/commit-msg"; then
+        check_ok "Managed commit-msg hook installed and executable"
+    else
+        check_warn "Installed commit-msg hook differs from the repository version"
+    fi
 else
-    check_warn "Local commit-msg hook missing or not executable"
+    check_warn "Managed commit-msg hook missing or not executable"
 fi
 
-if [[ -d "$ICLOUD_GIT_CONFIG_ROOT" ]]; then
-    check_ok "Optional iCloud git config source found: $ICLOUD_GIT_CONFIG_ROOT"
+if cmp -s "$CONFIGS_DIR/ignore.local" "$LOCAL_GIT_EXCLUDES"; then
+    check_ok "Managed local Git excludes installed"
 else
-    check_warn "Optional iCloud git config source not found: $ICLOUD_GIT_CONFIG_ROOT"
+    check_warn "Installed local Git excludes differ from the repository version"
 fi
 
-# ── GitHub version ──────────────────────────────────────
+# ── Git repository ──────────────────────────────────────
 
 if [[ -d "$REPO_ROOT/.git" ]]; then
     check_ok "Repo is a git checkout"
@@ -164,49 +153,7 @@ if [[ -d "$REPO_ROOT/.git" ]]; then
         check_warn "Repo is a git checkout, but git is not available"
     fi
 else
-    check_ok "Non-git bootstrap copy detected"
-
-    if command -v curl >/dev/null 2>&1; then
-        GITHUB_RAW_BASE="https://raw.githubusercontent.com/tommiec/mac-workstation/main/scripts"
-        GITHUB_FETCH_FAILED=0
-        GITHUB_MISMATCH_COUNT=0
-
-        if ! TMP_GITHUB_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mm_doctor_github.XXXXXX")"; then
-            check_warn "Could not create temp folder for GitHub version check"
-            TMP_GITHUB_DIR=""
-            GITHUB_FETCH_FAILED=1
-        fi
-
-        if [[ "$GITHUB_FETCH_FAILED" -eq 0 ]]; then
-            for f in mm_common.sh mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh mm_backup_ssh.sh mm_backup_gpg.sh; do
-                LOCAL_FILE="$REPO_ROOT/scripts/$f"
-                REMOTE_FILE="$TMP_GITHUB_DIR/$f"
-
-                if ! curl -fsSL "$GITHUB_RAW_BASE/$f" -o "$REMOTE_FILE"; then
-                    GITHUB_FETCH_FAILED=1
-                    break
-                fi
-
-                if ! cmp -s "$LOCAL_FILE" "$REMOTE_FILE"; then
-                    GITHUB_MISMATCH_COUNT=$((GITHUB_MISMATCH_COUNT + 1))
-                fi
-            done
-        fi
-
-        if [[ -n "$TMP_GITHUB_DIR" ]]; then
-            rm -rf "$TMP_GITHUB_DIR"
-        fi
-
-        if [[ "$GITHUB_FETCH_FAILED" -eq 1 ]]; then
-            check_warn "Could not compare bootstrap copy with GitHub"
-        elif [[ "$GITHUB_MISMATCH_COUNT" -eq 0 ]]; then
-            check_ok "Installed scripts match GitHub main"
-        else
-            check_warn "$GITHUB_MISMATCH_COUNT installed script(s) differ from GitHub main"
-        fi
-    else
-        check_warn "curl not found; GitHub version check skipped"
-    fi
+    check_fail "Canonical repository is not a git checkout: $REPO_ROOT"
 fi
 
 # ── LaunchAgent ─────────────────────────────────────────
@@ -225,9 +172,8 @@ fi
 
 if [[ -f "$LAUNCH_AGENT_PATH" ]]; then
     EXPECTED_REPO="$REPO_ROOT/scripts/mm_auto.sh"
-    EXPECTED_SYMLINK="$SYMLINK_PATH/scripts/mm_auto.sh"
 
-    if grep -Fq "$EXPECTED_REPO" "$LAUNCH_AGENT_PATH" || grep -Fq "$EXPECTED_SYMLINK" "$LAUNCH_AGENT_PATH"; then
+    if grep -Fq "$EXPECTED_REPO" "$LAUNCH_AGENT_PATH"; then
         check_ok "LaunchAgent points to the expected mm_auto.sh"
     else
         check_fail "LaunchAgent does not point to the expected mm_auto.sh"
