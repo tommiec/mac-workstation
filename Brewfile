@@ -36,7 +36,9 @@ cask "utm"
 
 # ── Casks: Data / modeling ──────────────────────────────
 cask "mysqlworkbench"
-cask "visual-paradigm"
+# visual-paradigm: cask broken upstream (vendor re-uploaded/unsigned builds,
+# 18.1 bump rejected in Homebrew/homebrew-cask#271475); re-add once a signed
+# release lands.
 
 # ── CLI: Development ────────────────────────────────────
 brew "git"
