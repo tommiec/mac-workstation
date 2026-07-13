@@ -23,6 +23,7 @@ cask "microsoft-teams"
 
 # ── Casks: Security / networking ────────────────────────
 cask "balenaetcher"
+cask "burp-suite"
 cask "cyberduck"
 cask "malwarebytes"
 cask "wireshark-app"
@@ -63,7 +64,6 @@ brew "docker-compose"
 brew "trivy"
 
 # ── CLI: Security / reverse engineering ─────────────────
-brew "burp"
 brew "ghidra"
 brew "john-jumbo"
 brew "sqlmap"
