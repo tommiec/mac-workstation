@@ -49,6 +49,19 @@ LAUNCH_AGENT_LABEL="local.mac-manager.auto-maintenance"
 LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LAUNCH_AGENT_LABEL}.plist"
 LEGACY_LAUNCH_AGENT_LABEL="local.mac.auto-maintenance"
 LEGACY_LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LEGACY_LAUNCH_AGENT_LABEL}.plist"
+OLLAMA_SERVICE_LABEL="homebrew.mxcl.ollama"
+OLLAMA_SERVICE_PATH="$HOME/Library/LaunchAgents/${OLLAMA_SERVICE_LABEL}.plist"
+OLLAMA_HOST="0.0.0.0:11434"
+OLLAMA_LOCAL_API="http://127.0.0.1:11434"
+OLLAMA_PULL_MAX_ATTEMPTS=4
+OLLAMA_PULL_RETRY_DELAY=10
+
+OLLAMA_MODELS=(
+  devstral:24b
+  qwen3-coder:30b
+  gemma3:27b
+  qwen2.5-coder:14b
+)
 
 # launchd: 0=Sunday ... 6=Saturday
 AUTO_WEEKDAY=6
@@ -384,4 +397,101 @@ load_auto_launch_agent() {
     else
         return 1
     fi
+}
+
+# ── Ollama Homebrew service ─────────────────────────────
+
+set_plist_environment_value() {
+    local plist="$1"
+    local key="$2"
+    local value="$3"
+
+    if /usr/libexec/PlistBuddy -c "Print :EnvironmentVariables:$key" "$plist" >/dev/null 2>&1; then
+        /usr/libexec/PlistBuddy -c "Set :EnvironmentVariables:$key $value" "$plist"
+    else
+        /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:$key string $value" "$plist"
+    fi
+}
+
+plist_environment_value_equals() {
+    local plist="$1"
+    local key="$2"
+    local expected="$3"
+    local actual=""
+
+    actual="$(/usr/libexec/PlistBuddy -c "Print :EnvironmentVariables:$key" "$plist" 2>/dev/null || true)"
+    [[ "$actual" == "$expected" ]]
+}
+
+configure_ollama_homebrew_service() {
+    command -v brew >/dev/null 2>&1 || return 1
+    command -v ollama >/dev/null 2>&1 || return 1
+
+    # Homebrew remains the sole service owner and generates the service plist.
+    # Mac Manager only adds settings that the formula itself does not expose.
+    if [[ ! -f "$OLLAMA_SERVICE_PATH" ]]; then
+        brew services start ollama >/dev/null 2>&1 || return 1
+    fi
+    [[ -f "$OLLAMA_SERVICE_PATH" ]] || return 1
+
+    if /bin/launchctl print "gui/$(id -u)/$OLLAMA_SERVICE_LABEL" >/dev/null 2>&1 \
+        && plist_environment_value_equals "$OLLAMA_SERVICE_PATH" OLLAMA_HOST "$OLLAMA_HOST" \
+        && plist_environment_value_equals "$OLLAMA_SERVICE_PATH" OLLAMA_FLASH_ATTENTION 1 \
+        && plist_environment_value_equals "$OLLAMA_SERVICE_PATH" OLLAMA_KV_CACHE_TYPE q8_0 \
+        && plist_environment_value_equals "$OLLAMA_SERVICE_PATH" OLLAMA_MAX_LOADED_MODELS 1 \
+        && plist_environment_value_equals "$OLLAMA_SERVICE_PATH" OLLAMA_NUM_PARALLEL 1; then
+        return 0
+    fi
+
+    /bin/launchctl bootout "gui/$(id -u)/$OLLAMA_SERVICE_LABEL" >/dev/null 2>&1 || true
+    set_plist_environment_value "$OLLAMA_SERVICE_PATH" OLLAMA_HOST "$OLLAMA_HOST" || return 1
+    set_plist_environment_value "$OLLAMA_SERVICE_PATH" OLLAMA_FLASH_ATTENTION 1 || return 1
+    set_plist_environment_value "$OLLAMA_SERVICE_PATH" OLLAMA_KV_CACHE_TYPE q8_0 || return 1
+    set_plist_environment_value "$OLLAMA_SERVICE_PATH" OLLAMA_MAX_LOADED_MODELS 1 || return 1
+    set_plist_environment_value "$OLLAMA_SERVICE_PATH" OLLAMA_NUM_PARALLEL 1 || return 1
+    plutil -lint "$OLLAMA_SERVICE_PATH" >/dev/null || return 1
+
+    /bin/launchctl bootstrap "gui/$(id -u)" "$OLLAMA_SERVICE_PATH" || return 1
+    /bin/launchctl print "gui/$(id -u)/$OLLAMA_SERVICE_LABEL" >/dev/null 2>&1
+}
+
+wait_for_ollama() {
+    local attempt=0
+
+    while [[ "$attempt" -lt 30 ]]; do
+        if curl -fsS "$OLLAMA_LOCAL_API/api/version" >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 1
+        attempt=$((attempt + 1))
+    done
+    return 1
+}
+
+pull_ollama_model_with_retry() {
+    local model="$1"
+    local attempt=1
+    local delay="$OLLAMA_PULL_RETRY_DELAY"
+
+    while [[ "$attempt" -le "$OLLAMA_PULL_MAX_ATTEMPTS" ]]; do
+        echo "   Pulling model: $model (attempt $attempt/$OLLAMA_PULL_MAX_ATTEMPTS)"
+
+        # Ollama resumes partial blobs and verifies their SHA-256 digests before
+        # it writes the model manifest. A successful 'show' then confirms that
+        # the installed manifest is readable by the local server.
+        if ollama pull "$model" && ollama show "$model" >/dev/null 2>&1; then
+            echo "   ✅ $model downloaded and SHA-256 verified by Ollama"
+            return 0
+        fi
+
+        if [[ "$attempt" -lt "$OLLAMA_PULL_MAX_ATTEMPTS" ]]; then
+            echo "   ⚠️  $model pull failed; retrying in ${delay}s (partial download is retained)"
+            sleep "$delay"
+            delay=$((delay * 2))
+        fi
+        attempt=$((attempt + 1))
+    done
+
+    echo "   ❌ $model failed after $OLLAMA_PULL_MAX_ATTEMPTS attempts"
+    return 1
 }

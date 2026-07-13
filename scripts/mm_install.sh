@@ -11,7 +11,8 @@
 #        ~/.local/bin/mm
 #   2. Installs Homebrew if needed
 #   3. Installs all apps and CLI tools from the Brewfile (brew bundle)
-#   4. Registers mm_auto.sh as a weekly launchd agent
+#   4. Starts Ollama for LAN access and installs the managed models
+#   5. Registers mm_auto.sh as a weekly launchd agent
 #        (every Saturday at 02:00)
 #
 # After installation:
@@ -127,6 +128,46 @@ if [[ -f "$BREWFILE" ]]; then
         brew bundle install --file "$BREWFILE" --no-upgrade
 else
     log_warn "Brewfile not found: $BREWFILE"
+fi
+
+echo
+echo "── 🦙 Ollama ─────────────────────────────────────"
+
+OLLAMA_READY=0
+if configure_ollama_homebrew_service && wait_for_ollama; then
+    OLLAMA_READY=1
+    log_ok "Ollama Homebrew service running at $OLLAMA_HOST"
+    log_info "Ollama has no API authentication; expose it only on a trusted LAN"
+else
+    log_warn "Ollama Homebrew service setup failed"
+fi
+
+if [[ "$OLLAMA_READY" -eq 1 ]]; then
+    MODEL_PRESENT=0
+    MODEL_INSTALLED=0
+    MODEL_FAILED=0
+    MODEL_FAILED_NAMES=""
+
+    for model in "${OLLAMA_MODELS[@]}"; do
+        if ollama show "$model" >/dev/null 2>&1; then
+            MODEL_PRESENT=$((MODEL_PRESENT + 1))
+        else
+            if pull_ollama_model_with_retry "$model"; then
+                MODEL_INSTALLED=$((MODEL_INSTALLED + 1))
+            else
+                MODEL_FAILED=$((MODEL_FAILED + 1))
+                MODEL_FAILED_NAMES="${MODEL_FAILED_NAMES:+$MODEL_FAILED_NAMES, }$model"
+            fi
+        fi
+    done
+
+    if [[ "$MODEL_FAILED" -eq 0 ]]; then
+        log_ok "Ollama models: $MODEL_PRESENT already present, $MODEL_INSTALLED installed"
+    else
+        log_warn "Ollama models: $MODEL_PRESENT already present, $MODEL_INSTALLED installed, $MODEL_FAILED failed ($MODEL_FAILED_NAMES)"
+    fi
+else
+    log_warn "Ollama model installation skipped because the service is unavailable"
 fi
 
 run_step "brew cleanup" brew cleanup
