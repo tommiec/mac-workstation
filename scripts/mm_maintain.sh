@@ -62,6 +62,15 @@ fi
 
 run_step "brew update" brew update
 
+# Visibility on drift: anything installed outside the Brewfile.
+UNMANAGED="$(list_unmanaged_packages)"
+if [[ -z "$UNMANAGED" ]]; then
+    log_ok "No packages installed outside the Brewfile"
+else
+    log_warn "Packages installed outside the Brewfile:"
+    echo "$UNMANAGED" | sed 's/^/      /'
+fi
+
 OUTDATED_CASKS_RAW="$(brew outdated --cask --quiet 2>/dev/null || true)"
 OUTDATED_CASK_COUNT="$(printf '%s\n' "$OUTDATED_CASKS_RAW" | awk 'NF { count++ } END { print count + 0 }')"
 
@@ -117,16 +126,13 @@ else
 fi
 
 # ── macOS updates ────────────────────
-# grep -c exits with 1 for 0 matches; || true handles that.
 
 echo
 echo "── 🍎 macOS updates ──────────────────────────────"
 
 UPDATES="$(/usr/sbin/softwareupdate --list 2>&1 || true)"
 echo "$UPDATES" >> "$RUN_LOG"
-
-COUNT=$(echo "$UPDATES" | grep -cE '^[[:space:]]*\*' || true)
-COUNT=${COUNT:-0}
+COUNT="$(count_macos_updates "$UPDATES")"
 
 if [[ "$COUNT" -eq 0 ]]; then
     log_ok "No macOS updates available"

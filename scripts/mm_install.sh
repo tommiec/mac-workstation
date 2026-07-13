@@ -10,7 +10,7 @@
 #   1. Creates a command wrapper:
 #        ~/.local/bin/mm
 #   2. Installs Homebrew if needed
-#   3. Installs all apps from MANAGED_CASKS and CLI_TOOLS
+#   3. Installs all apps and CLI tools from the Brewfile (brew bundle)
 #   4. Registers mm_auto.sh as a weekly launchd agent
 #        (every Saturday at 02:00)
 #
@@ -49,25 +49,10 @@ cat > "$MM_PATH" <<'EOF'
 MM_SCRIPTS_DIR="$HOME/Repositories/dev/mac-workstation/scripts"
 
 case "$1" in
-  auto)
+  auto|maintain|install|doctor|triage)
+    MM_CMD="$1"
     shift
-    "$MM_SCRIPTS_DIR/mm_auto.sh" "$@"
-    ;;
-  maintain)
-    shift
-    "$MM_SCRIPTS_DIR/mm_maintain.sh" "$@"
-    ;;
-  install)
-    shift
-    "$MM_SCRIPTS_DIR/mm_install.sh" "$@"
-    ;;
-  doctor)
-    shift
-    "$MM_SCRIPTS_DIR/mm_doctor.sh" "$@"
-    ;;
-  triage)
-    shift
-    "$MM_SCRIPTS_DIR/mm_triage.sh" "$@"
+    exec "$MM_SCRIPTS_DIR/mm_${MM_CMD}.sh" "$@"
     ;;
   help|"")
     echo "Usage:"
@@ -131,59 +116,17 @@ run_step "mm command PATH setup" setup_mm_command_path
 run_step "git global exclude setup" setup_git_global
 
 # ── Install apps ─────────────────────
+# The full app and CLI tool list is declarative in the Brewfile; brew bundle
+# installs what is missing. --no-upgrade: upgrades belong to mm maintain/auto.
 
 echo
-echo "── 📦 Applications ───────────────────────────────"
+echo "── 📦 Applications & CLI tools ───────────────────"
 
-CASK_PRESENT=0
-CASK_INSTALLED=0
-CASK_FAILED=0
-CASK_FAILED_NAMES=""
-for pkg in "${MANAGED_CASKS[@]}"; do
-    if brew list --cask "$pkg" &>/dev/null; then
-        CASK_PRESENT=$((CASK_PRESENT + 1))
-    else
-        echo "   Installing cask: $pkg"
-        if brew install --cask "$pkg"; then
-            CASK_INSTALLED=$((CASK_INSTALLED + 1))
-        else
-            CASK_FAILED=$((CASK_FAILED + 1))
-            CASK_FAILED_NAMES="${CASK_FAILED_NAMES:+$CASK_FAILED_NAMES, }$pkg"
-        fi
-    fi
-done
-
-if [[ "$CASK_FAILED" -eq 0 ]]; then
-    log_ok "Casks: $CASK_PRESENT already installed, $CASK_INSTALLED installed"
+if [[ -f "$BREWFILE" ]]; then
+    run_step "brew bundle install (Brewfile)" \
+        brew bundle install --file "$BREWFILE" --no-upgrade
 else
-    log_warn "Casks: $CASK_PRESENT already installed, $CASK_INSTALLED installed, $CASK_FAILED failed ($CASK_FAILED_NAMES)"
-fi
-
-echo
-echo "── 🧰 CLI tools ──────────────────────────────────"
-
-TOOL_PRESENT=0
-TOOL_INSTALLED=0
-TOOL_FAILED=0
-TOOL_FAILED_NAMES=""
-for pkg in "${CLI_TOOLS[@]}"; do
-    if brew list "$pkg" &>/dev/null; then
-        TOOL_PRESENT=$((TOOL_PRESENT + 1))
-    else
-        echo "   Installing formula: $pkg"
-        if brew install "$pkg"; then
-            TOOL_INSTALLED=$((TOOL_INSTALLED + 1))
-        else
-            TOOL_FAILED=$((TOOL_FAILED + 1))
-            TOOL_FAILED_NAMES="${TOOL_FAILED_NAMES:+$TOOL_FAILED_NAMES, }$pkg"
-        fi
-    fi
-done
-
-if [[ "$TOOL_FAILED" -eq 0 ]]; then
-    log_ok "CLI tools: $TOOL_PRESENT already installed, $TOOL_INSTALLED installed"
-else
-    log_warn "CLI tools: $TOOL_PRESENT already installed, $TOOL_INSTALLED installed, $TOOL_FAILED failed ($TOOL_FAILED_NAMES)"
+    log_warn "Brewfile not found: $BREWFILE"
 fi
 
 run_step "brew cleanup" brew cleanup

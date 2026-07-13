@@ -11,10 +11,6 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/mm_common.sh"
 
-VAULT_PATH="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Secure Vault/Secrets.sparsebundle"
-VAULT_NAME="Secrets"
-VAULT_SIZE="2g"
-MOUNT_POINT="/Volumes/$VAULT_NAME"
 SSH_SOURCE="$HOME/.ssh"
 
 echo "── 🔐 SSH backup ──"
@@ -33,53 +29,25 @@ if ! command -v diskutil >/dev/null 2>&1 || ! command -v hdiutil >/dev/null 2>&1
     exit 1
 fi
 
-mkdir -p "$(dirname "$VAULT_PATH")"
-
-if [[ ! -e "$VAULT_PATH" ]]; then
-    echo "Creating encrypted sparsebundle..."
-    echo "Choose a strong password and store it in your password manager."
-    echo
-    if ! diskutil image create blank \
-        --encrypt \
-        --size "$VAULT_SIZE" \
-        --volumeName "$VAULT_NAME" \
-        --fs APFS \
-        "$VAULT_PATH"; then
-        echo "❌ Could not create encrypted sparsebundle"
-        exit 1
-    fi
-    echo
+if ! ensure_vault; then
+    echo "❌ Could not create encrypted sparsebundle"
+    exit 1
 fi
-
-MOUNTED_BY_SCRIPT=0
 
 cleanup() {
     local status="$1"
-    if [[ "$MOUNTED_BY_SCRIPT" -eq 1 && -d "$MOUNT_POINT" ]]; then
-        diskutil eject "$MOUNT_POINT" >/dev/null 2>&1 || true
-    fi
+    vault_eject
     record_script_result "mm_backup_ssh.sh" "$status"
 }
 trap 'status=$?; cleanup "$status"' EXIT
 
-if [[ -d "$MOUNT_POINT" ]]; then
-    echo "Using already mounted vault: $MOUNT_POINT"
-else
-    echo "Mounting vault..."
-    if ! hdiutil attach "$VAULT_PATH" -nobrowse -quiet; then
-        echo "❌ Could not mount encrypted sparsebundle"
-        exit 1
-    fi
-    MOUNTED_BY_SCRIPT=1
-fi
-
-if [[ ! -d "$MOUNT_POINT" ]]; then
-    echo "❌ Could not determine vault mount point"
+if ! vault_mount; then
+    echo "❌ Could not mount encrypted sparsebundle"
     exit 1
 fi
 
-BACKUP_ROOT="$MOUNT_POINT/ssh-backup"
-PEM_ARCHIVE="$MOUNT_POINT/pem-archive"
+BACKUP_ROOT="$VAULT_MOUNT_POINT/ssh-backup"
+PEM_ARCHIVE="$VAULT_MOUNT_POINT/pem-archive"
 mkdir -p "$BACKUP_ROOT" "$PEM_ARCHIVE"
 
 echo "Syncing ~/.ssh..."
@@ -109,7 +77,7 @@ echo "   Files: $SSH_FILE_COUNT"
 echo "   Backup: $BACKUP_ROOT/.ssh"
 echo "   PEM archive folder kept separate: $PEM_ARCHIVE"
 echo
-if [[ "$MOUNTED_BY_SCRIPT" -eq 1 ]]; then
+if [[ "$VAULT_MOUNTED_BY_SCRIPT" -eq 1 ]]; then
     echo "The vault will now be unmounted. Wait for iCloud Drive to finish syncing it."
 else
     echo "The vault was already mounted, so it will stay open."

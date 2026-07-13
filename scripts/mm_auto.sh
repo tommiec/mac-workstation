@@ -102,14 +102,12 @@ fi
 # ── macOS updates ────────────────────
 # Detect and report only; installation happens through 'mm maintain'.
 # softwareupdate --list writes to stderr; 2>&1 captures it.
-# grep -c exits with 1 for 0 matches; || true handles that.
 
 echo
 echo "── 🍎 macOS ──────────────────────────────────────"
 
 UPDATES="$(/usr/sbin/softwareupdate --list 2>&1 || true)"
-COUNT=$(echo "$UPDATES" | grep -cE '^[[:space:]]*\*' || true)
-COUNT=${COUNT:-0}
+COUNT="$(count_macos_updates "$UPDATES")"
 
 if [[ "$COUNT" -eq 0 ]]; then
     log_ok "No macOS updates available"

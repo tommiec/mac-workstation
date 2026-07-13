@@ -140,13 +140,19 @@ if [[ -d "$REPO_ROOT/.git" ]]; then
             check_warn "Git remote 'origin' is not configured"
         else
             check_ok "Git remote: origin ($REMOTE_URL)"
-            PULL_OUT="$(GIT_TERMINAL_PROMPT=0 git -C "$REPO_ROOT" pull --ff-only 2>&1 || true)"
-            if echo "$PULL_OUT" | grep -q "Already up to date"; then
-                check_ok "Scripts already up to date"
-            elif echo "$PULL_OUT" | grep -qE "Fast-forward|Updating"; then
-                check_ok "Scripts updated from GitHub"
+            # Report only — doctor never changes the checkout. Updating is
+            # 'git pull --ff-only' or the weekly auto run.
+            if GIT_TERMINAL_PROMPT=0 git -C "$REPO_ROOT" fetch --quiet 2>/dev/null; then
+                BEHIND="$(git -C "$REPO_ROOT" rev-list --count 'HEAD..@{upstream}' 2>/dev/null || echo "")"
+                if [[ -z "$BEHIND" ]]; then
+                    check_warn "No upstream branch configured; cannot compare with GitHub"
+                elif [[ "$BEHIND" -eq 0 ]]; then
+                    check_ok "Scripts up to date with GitHub"
+                else
+                    check_warn "Scripts are $BEHIND commit(s) behind GitHub — run 'git pull --ff-only'"
+                fi
             else
-                check_warn "Could not update from GitHub (offline or diverged)"
+                check_warn "Could not reach GitHub to compare versions (offline?)"
             fi
         fi
     else
@@ -197,6 +203,24 @@ if command -v brew >/dev/null 2>&1; then
         check_ok "No outdated Homebrew packages"
     else
         check_warn "$OUTDATED_COUNT outdated Homebrew package(s)"
+    fi
+
+    if [[ -f "$BREWFILE" ]]; then
+        if brew bundle check --file "$BREWFILE" >/dev/null 2>&1; then
+            check_ok "All Brewfile packages installed"
+        else
+            check_warn "Brewfile packages missing — run 'mm install'"
+        fi
+
+        UNMANAGED="$(list_unmanaged_packages)"
+        if [[ -z "$UNMANAGED" ]]; then
+            check_ok "No packages installed outside the Brewfile"
+        else
+            check_warn "Packages installed outside the Brewfile — add them or uninstall:"
+            echo "$UNMANAGED" | sed 's/^/      /'
+        fi
+    else
+        check_fail "Brewfile missing: $BREWFILE"
     fi
 else
     check_fail "Homebrew not found"
@@ -299,7 +323,7 @@ if [[ -d "$HOME/.ssh" ]]; then
         KEY_TYPE_UPPER="$(echo "$KEY_TYPE" | tr '[:lower:]' '[:upper:]')"
         if [[ "$KEY_TYPE_UPPER" == "DSA" ]]; then
             [[ -n "$FLAGS" ]] && FLAGS="$FLAGS  "
-            FLAGS="${FLAGS}⚠ DSA (onveilig)"
+            FLAGS="${FLAGS}⚠ DSA (insecure)"
             SSH_WARN=$((SSH_WARN + 1))
         elif [[ "$KEY_TYPE_UPPER" == "RSA" && -n "$BITS" && "$BITS" -lt 3072 ]]; then
             [[ -n "$FLAGS" ]] && FLAGS="$FLAGS  "
@@ -307,7 +331,7 @@ if [[ -d "$HOME/.ssh" ]]; then
             SSH_WARN=$((SSH_WARN + 1))
         fi
 
-        printf "   %-24s %-7s %4sb  %-47s  gewijzigd: %s  perms: %s%s\n" \
+        printf "   %-24s %-7s %4sb  %-47s  modified: %s  perms: %s%s\n" \
             "$keyname" "$KEY_TYPE" "$BITS" "$FINGERPRINT" "$MODIFIED" "$PERMS" \
             "${FLAGS:+  $FLAGS}"
 
@@ -321,9 +345,9 @@ if [[ -d "$HOME/.ssh" ]]; then
         echo "      none found"
         check_ok "No SSH private keys found in ~/.ssh"
     elif [[ "$SSH_WARN" -eq 0 ]]; then
-        check_ok "$SSH_KEY_COUNT SSH private key(s) — geen hygiëneproblemen"
+        check_ok "$SSH_KEY_COUNT SSH private key(s) — no hygiene issues"
     else
-        check_warn "$SSH_KEY_COUNT SSH private key(s) — $SSH_WARN aandachtspunt(en) (zie boven)"
+        check_warn "$SSH_KEY_COUNT SSH private key(s) — $SSH_WARN attention point(s) (see above)"
     fi
 
     echo
@@ -337,7 +361,7 @@ if [[ -d "$HOME/.ssh" ]]; then
         KH_HOSTS="$(awk 'NF && $1 !~ /^#/ && $1 !~ /^\|1\|/ && !seen[$1]++ { count++ } END { print count + 0 }' "$KNOWN_HOSTS_FILE" 2>/dev/null)"
         KH_HASHED="$(awk 'NF && $1 ~ /^\|1\|/ && !seen[$0]++ { count++ } END { print count + 0 }' "$KNOWN_HOSTS_FILE" 2>/dev/null)"
 
-        printf "   known_hosts              visible: %s  hashed: %s  gewijzigd: %s  perms: %s\n" \
+        printf "   known_hosts              visible: %s  hashed: %s  modified: %s  perms: %s\n" \
             "$KH_HOSTS" "$KH_HASHED" "$KH_MODIFIED" "$KH_PERMS"
 
         KH_SAMPLE="$(awk 'NF && $1 !~ /^#/ && $1 !~ /^\|1\|/ && !seen[$1]++ { print $1; shown++ } shown == 6 { exit }' \
@@ -348,10 +372,10 @@ if [[ -d "$HOME/.ssh" ]]; then
                 echo "        - $host"
             done <<< "$KH_SAMPLE"
         elif [[ "$KH_HASHED" -gt 0 ]]; then
-            echo "      sample: hosts zijn gehashed"
+            echo "      sample: hosts are hashed"
         fi
     else
-        check_warn "Geen ~/.ssh/known_hosts gevonden"
+        check_warn "No ~/.ssh/known_hosts found"
     fi
 else
     check_warn "$HOME/.ssh folder not found"
