@@ -226,6 +226,55 @@ else
     check_fail "Homebrew not found"
 fi
 
+# ── Ollama ──────────────────────────────────────────────
+
+echo
+echo "── 🦙 Ollama ─────────────────────────────────────"
+
+if command -v ollama >/dev/null 2>&1; then
+    check_ok "Ollama CLI found: $(command -v ollama)"
+else
+    check_fail "Ollama CLI not found"
+fi
+
+if [[ -f "$OLLAMA_SERVICE_PATH" ]]; then
+    check_ok "Ollama Homebrew service plist present"
+    if /usr/libexec/PlistBuddy -c "Print :EnvironmentVariables:OLLAMA_HOST" "$OLLAMA_SERVICE_PATH" 2>/dev/null \
+        | grep -Fxq "$OLLAMA_HOST"; then
+        check_ok "Ollama Homebrew service configured for LAN access at $OLLAMA_HOST"
+    else
+        check_fail "Ollama Homebrew service does not contain the expected LAN binding"
+    fi
+else
+    check_fail "Ollama Homebrew service plist missing: $OLLAMA_SERVICE_PATH"
+fi
+
+if launchctl print "gui/$(id -u)/$OLLAMA_SERVICE_LABEL" >/dev/null 2>&1; then
+    check_ok "Ollama Homebrew service loaded: $OLLAMA_SERVICE_LABEL"
+else
+    check_fail "Ollama Homebrew service not loaded: $OLLAMA_SERVICE_LABEL"
+fi
+
+if curl -fsS "$OLLAMA_LOCAL_API/api/version" >/dev/null 2>&1; then
+    check_ok "Ollama API responding locally"
+
+    OLLAMA_MISSING_MODELS=0
+    for model in "${OLLAMA_MODELS[@]}"; do
+        if ollama show "$model" >/dev/null 2>&1; then
+            check_ok "Ollama model present: $model"
+        else
+            check_warn "Ollama model missing: $model — run 'mm install'"
+            OLLAMA_MISSING_MODELS=$((OLLAMA_MISSING_MODELS + 1))
+        fi
+    done
+
+    if [[ "$OLLAMA_MISSING_MODELS" -eq 0 ]]; then
+        check_ok "All managed Ollama models installed"
+    fi
+else
+    check_fail "Ollama API not responding at $OLLAMA_LOCAL_API"
+fi
+
 # ── Secrets & SSH ───────────────────────────────────────
 # Goal: nothing sensitive should live as plain text in dotfiles.
 # API keys should come from a password manager, Keychain helper, or another

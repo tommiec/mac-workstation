@@ -99,6 +99,16 @@ else
     log_warn "brew unavailable — skipping brew steps"
 fi
 
+# Homebrew may regenerate its service plist during an Ollama upgrade. Reapply
+# the managed LAN/memory settings to that same Homebrew-owned service.
+if command -v ollama >/dev/null 2>&1; then
+    if configure_ollama_homebrew_service && wait_for_ollama; then
+        log_ok "Ollama Homebrew service configured"
+    else
+        log_warn "Ollama Homebrew service configuration failed"
+    fi
+fi
+
 # ── macOS updates ────────────────────
 # Detect and report only; installation happens through 'mm maintain'.
 # softwareupdate --list writes to stderr; 2>&1 captures it.

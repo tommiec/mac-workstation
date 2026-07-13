@@ -59,6 +59,7 @@ The installer will:
 - install all apps and CLI tools from the `Brewfile` (via `brew bundle`)
 - install the `mm` command in `~/.local/bin`
 - configure global Git excludes and a local Git hooks path
+- start Ollama as a persistent user service and pull the managed models
 - register the weekly launchd job
 
 The installer ensures that the user-local command folder is in your shell path
@@ -76,6 +77,48 @@ git pull --ff-only
 ```
 
 Normal script changes are active directly after `git pull`. Run `mm install` only if you changed installer-managed setup: the app list, LaunchAgent schedule, or `mm` wrapper.
+
+### Ollama for the local network
+
+`mm install` starts Ollama through its native Homebrew service
+(`homebrew.mxcl.ollama`) and listens on all network interfaces at port `11434`.
+There is deliberately no second Mac Manager Ollama service. The installer adds
+the LAN and memory settings to Homebrew's generated service plist, reloads that
+same service, and then installs these models when missing:
+
+```text
+devstral:24b
+qwen3-coder:30b
+gemma3:27b
+qwen2.5-coder:14b
+```
+
+Allow roughly 60 GB of model storage under `~/.ollama/models`. From the NAS,
+test the connection using the Mac's stable LAN address:
+
+```bash
+curl http://MAC_LAN_IP:11434/api/tags
+```
+
+Large model pulls use up to four attempts with delays of 10, 20, and 40
+seconds. Ollama retains partial downloads between attempts, resumes them on the
+next `pull`, and verifies every downloaded blob against its SHA-256 digest
+before writing the model manifest. The installer additionally requires
+`ollama show` to read the completed model successfully. Re-running `mm install`
+continues any model that still failed after all attempts.
+
+The service enables Flash Attention, uses a `q8_0` KV cache, and limits Ollama
+to one loaded model and one parallel request. This is intentional for a Mac
+with 36 GB unified memory: every managed model fits individually without trying
+to keep multiple 14–19 GB model images resident at once.
+
+Ollama's local API has no authentication. Binding it to `0.0.0.0:11434`
+therefore makes model execution available to every device that can reach that
+port. Use this only on a trusted LAN, do not forward port `11434` on the router,
+and restrict access with the macOS firewall or a separate authenticated reverse
+proxy when needed. The Mac must be logged in and awake because `brew services`
+runs Ollama as a user LaunchAgent; reserving its LAN address in DHCP keeps the
+NAS endpoint stable.
 
 ### Local Git config bootstrap
 
