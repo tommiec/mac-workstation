@@ -38,24 +38,12 @@ cask "utm"
 cask "mysqlworkbench"
 cask "visual-paradigm"
 
-# ── CLI: Development / shell productivity ───────────────
-brew "bat"
-brew "fd"
-brew "fzf"
-brew "gh"
+# ── CLI: Development ────────────────────────────────────
 brew "git"
-brew "jq"
-brew "mas"
-brew "pre-commit"
-brew "ripgrep"
 brew "shellcheck"
-brew "tmux"
-brew "tree"
-brew "yq"
 
 # ── CLI: Python / AI ────────────────────────────────────
 brew "ollama"
-brew "pipx"
 brew "uv"
 
 # ── CLI: DevOps / containers / cloud-native ─────────────
@@ -63,15 +51,13 @@ brew "docker"
 brew "docker-compose"
 brew "trivy"
 
-# ── CLI: Security / reverse engineering ─────────────────
-brew "ghidra"
+# ── CLI: Security ───────────────────────────────────────
 brew "john-jumbo"
 brew "sqlmap"
 brew "virustotal-cli"
 
-# ── CLI: Network / VPN ──────────────────────────────────
+# ── CLI: Network ────────────────────────────────────────
 brew "nmap"
-brew "openvpn"
 brew "wget"
 brew "wireshark"
 
