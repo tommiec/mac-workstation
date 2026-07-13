@@ -120,7 +120,7 @@ mm triage <file>  # inspect a suspicious file
 mm help      # show available commands
 ```
 
-`mm maintain` reports Homebrew packages installed outside the `Brewfile`, then asks before taking optional actions: upgrading outdated Homebrew casks, installing macOS updates, backing up `~/.ssh` and GPG keys/trust to the encrypted iCloud vault, and clearing QuickTime Player's recent documents history. The QuickTime cleanup removes QuickTime's app-specific recent-document shared-file-list entries and legacy QuickTime preference keys. It does not delete media files and does not clear system-wide macOS Recent Items.
+`mm maintain` reports drift so keeping, uninstalling, or adopting into the `Brewfile` stays a deliberate choice: Homebrew packages installed outside the `Brewfile`, and apps in `/Applications` that did not come in through Homebrew (labelled App Store or manual install). It then asks before taking optional actions: upgrading outdated Homebrew casks, installing macOS updates, backing up `~/.ssh` and GPG keys/trust to the encrypted iCloud vault, and clearing QuickTime Player's recent documents history. The QuickTime cleanup removes QuickTime's app-specific recent-document shared-file-list entries and legacy QuickTime preference keys. It does not delete media files and does not clear system-wide macOS Recent Items.
 
 ## File triage
 

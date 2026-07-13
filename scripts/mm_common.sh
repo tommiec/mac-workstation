@@ -224,9 +224,44 @@ setup_git_global() {
 
 # Lists installed formulas/casks that are not declared in the Brewfile
 # (dry-run of 'brew bundle cleanup'). Empty output means nothing unmanaged.
+# Only the package sections are kept: the dry-run also prints cache-cleanup
+# lines and a --force hint, which are not drift.
 list_unmanaged_packages() {
     [[ -f "$BREWFILE" ]] || return 0
-    brew bundle cleanup --file "$BREWFILE" 2>/dev/null || true
+    brew bundle cleanup --file "$BREWFILE" 2>/dev/null \
+        | awk '/^Would uninstall (formulae|casks):/ { grab=1; print; next }
+               /^(Would|Run) / { grab=0 }
+               grab && NF' || true
+}
+
+# Lists apps in /Applications that no installed Homebrew cask accounts for,
+# labelled "(App Store)" or "(manual install)". Matching is best-effort:
+# app bundles in the Caskroom, .app names in cask metadata, and normalized
+# cask tokens (malwarebytes ↔ Malwarebytes.app). Empty output means every
+# app is explained.
+list_unmanaged_apps() {
+    local caskroom known tokens app name norm
+    caskroom="$(brew --prefix 2>/dev/null)/Caskroom"
+    [[ -d "$caskroom" ]] || return 0
+
+    known="$( { find "$caskroom" -maxdepth 3 -name '*.app' 2>/dev/null;
+        grep -rhoE '"[^"]*\.app"' "$caskroom"/*/.metadata 2>/dev/null | tr -d '"'; } \
+        | sed 's|.*/||' | sort -u)"
+    tokens="$(brew list --cask 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed 's/-app$//' | tr -d -- '-')"
+
+    for app in /Applications/*.app; do
+        [[ -e "$app" ]] || continue
+        name="$(basename "$app")"
+        [[ "$name" == "Safari.app" ]] && continue
+        grep -Fxq "$name" <<< "$known" && continue
+        norm="$(printf '%s' "${name%.app}" | tr '[:upper:]' '[:lower:]' | tr -d ' .-')"
+        grep -Fxq "$norm" <<< "$tokens" && continue
+        if [[ -d "$app/Contents/_MASReceipt" ]]; then
+            echo "$name (App Store)"
+        else
+            echo "$name (manual install)"
+        fi
+    done
 }
 
 ensure_brew() {
