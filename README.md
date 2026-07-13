@@ -8,7 +8,7 @@ A consistent, low-effort way to bootstrap my Mac, keep core tooling maintained, 
 
 One-time setup. Runs automatically. Manual control when needed.
 
-> **Using this yourself?** The app list in `mm_common.sh` (`MANAGED_CASKS`, `CLI_TOOLS`) is mine. Fork the repo and replace those lists with your own before running the installer.
+> **Using this yourself?** The app list in the `Brewfile` is mine. Fork the repo and replace it with your own before running the installer.
 >
 > `mm` stands for **Mac Manager**.
 
@@ -23,7 +23,9 @@ One-time setup. Runs automatically. Manual control when needed.
 | `mm_triage.sh` | Quick file/malware triage with hash, VirusTotal and strings (`mm triage`) |
 | `mm_backup_ssh.sh` | Backup `~/.ssh` to an encrypted iCloud sparsebundle (called by `mm maintain`) |
 | `mm_backup_gpg.sh` | Backup GPG keys, ownertrust and `~/.gnupg` to the encrypted iCloud sparsebundle |
-| `mm_common.sh` | Shared configuration and helpers (app list lives here) |
+| `mm_common.sh` | Shared configuration and helpers |
+
+The managed apps and CLI tools are declared in the repo-root `Brewfile` and installed with `brew bundle`.
 
 ## How it works
 
@@ -54,7 +56,7 @@ Command Line Tools installation, and then repeat the commands above.
 
 The installer will:
 - set up Homebrew (if needed)
-- install all apps from `MANAGED_CASKS` and `CLI_TOOLS` in `mm_common.sh`
+- install all apps and CLI tools from the `Brewfile` (via `brew bundle`)
 - install the `mm` command in `~/.local/bin`
 - configure global Git excludes and a local Git hooks path
 - register the weekly launchd job
@@ -118,9 +120,11 @@ mm triage <file>  # inspect a suspicious file
 mm help      # show available commands
 ```
 
-`mm maintain` asks before taking optional actions: upgrading outdated Homebrew casks, installing macOS updates, backing up `~/.ssh` and GPG keys/trust to the encrypted iCloud vault, and clearing QuickTime Player's recent documents history. The QuickTime cleanup removes QuickTime's app-specific recent-document shared-file-list entries and legacy QuickTime preference keys. It does not delete media files and does not clear system-wide macOS Recent Items.
+`mm maintain` reports Homebrew packages installed outside the `Brewfile`, then asks before taking optional actions: upgrading outdated Homebrew casks, installing macOS updates, backing up `~/.ssh` and GPG keys/trust to the encrypted iCloud vault, and clearing QuickTime Player's recent documents history. The QuickTime cleanup removes QuickTime's app-specific recent-document shared-file-list entries and legacy QuickTime preference keys. It does not delete media files and does not clear system-wide macOS Recent Items.
 
 ## File triage
+
+File triage is a deliberate part of this workstation setup, not an add-on: the machine should be able to handle quick, self-contained file research on its own, without reaching for a separate analysis environment first.
 
 Use `mm triage` for a quick first look at a suspicious file:
 
@@ -206,6 +210,7 @@ Unmount the vault after use and let iCloud Drive finish syncing before shutting 
 - Writes logs and last-run status under `~/Library/Logs/mac_manager/`
 - Safe to re-run `mm install` at any time, but usually only needed after installer-managed setup changes
 - `mm doctor` can be used to validate the setup and inspect the last recorded run for each script
+- `mm doctor` is read-only: it reports drift (including whether the checkout is behind GitHub) but never changes the system; updating happens via `git pull --ff-only` or the weekly auto run
 - Global Git hygiene is installed by `mm install`: shared excludes come from
   this repo, while machine-local excludes and hooks live under `~/.config/git`
   and are not stored here.

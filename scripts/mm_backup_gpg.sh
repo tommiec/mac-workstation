@@ -11,14 +11,9 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/mm_common.sh"
 
-VAULT_PATH="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Secure Vault/Secrets.sparsebundle"
-VAULT_NAME="Secrets"
-VAULT_SIZE="2g"
-MOUNT_POINT="/Volumes/$VAULT_NAME"
 GPG_SOURCE="${GNUPGHOME:-$HOME/.gnupg}"
 STAMP="$(date '+%Y-%m-%d_%H-%M-%S')"
 TMP_BACKUP=""
-MOUNTED_BY_SCRIPT=0
 
 echo "── 🔏 GPG backup ──"
 echo
@@ -38,22 +33,9 @@ for tool in diskutil hdiutil rsync gpg tar; do
     fi
 done
 
-mkdir -p "$(dirname "$VAULT_PATH")"
-
-if [[ ! -e "$VAULT_PATH" ]]; then
-    echo "Creating encrypted sparsebundle..."
-    echo "Choose a strong password and store it in your password manager."
-    echo
-    if ! diskutil image create blank \
-        --encrypt \
-        --size "$VAULT_SIZE" \
-        --volumeName "$VAULT_NAME" \
-        --fs APFS \
-        "$VAULT_PATH"; then
-        echo "❌ Could not create encrypted sparsebundle"
-        exit 1
-    fi
-    echo
+if ! ensure_vault; then
+    echo "❌ Could not create encrypted sparsebundle"
+    exit 1
 fi
 
 cleanup() {
@@ -61,26 +43,13 @@ cleanup() {
     if [[ -n "$TMP_BACKUP" && -d "$TMP_BACKUP" ]]; then
         rm -rf "$TMP_BACKUP"
     fi
-    if [[ "$MOUNTED_BY_SCRIPT" -eq 1 && -d "$MOUNT_POINT" ]]; then
-        diskutil eject "$MOUNT_POINT" >/dev/null 2>&1 || true
-    fi
+    vault_eject
     record_script_result "mm_backup_gpg.sh" "$status"
 }
 trap 'status=$?; cleanup "$status"' EXIT
 
-if [[ -d "$MOUNT_POINT" ]]; then
-    echo "Using already mounted vault: $MOUNT_POINT"
-else
-    echo "Mounting vault..."
-    if ! hdiutil attach "$VAULT_PATH" -nobrowse -quiet; then
-        echo "❌ Could not mount encrypted sparsebundle"
-        exit 1
-    fi
-    MOUNTED_BY_SCRIPT=1
-fi
-
-if [[ ! -d "$MOUNT_POINT" ]]; then
-    echo "❌ Could not determine vault mount point"
+if ! vault_mount; then
+    echo "❌ Could not mount encrypted sparsebundle"
     exit 1
 fi
 
@@ -154,7 +123,7 @@ restore_secret=gpg --import secret-keys.asc
 restore_ownertrust=gpg --import-ownertrust ownertrust.txt
 EOF
 
-BACKUP_ROOT="$MOUNT_POINT/gpg-backup"
+BACKUP_ROOT="$VAULT_MOUNT_POINT/gpg-backup"
 LATEST_DIR="$BACKUP_ROOT/latest"
 ARCHIVE_DIR="$BACKUP_ROOT/archives"
 ARCHIVE_PATH="$ARCHIVE_DIR/gpg-backup-$STAMP.tar.gz"
@@ -198,7 +167,7 @@ echo "   Full .gnupg files: $FULL_FILE_COUNT"
 echo "   Latest backup: $LATEST_DIR"
 echo "   Archive: $ARCHIVE_PATH"
 echo
-if [[ "$MOUNTED_BY_SCRIPT" -eq 1 ]]; then
+if [[ "$VAULT_MOUNTED_BY_SCRIPT" -eq 1 ]]; then
     echo "The vault will now be unmounted. Wait for iCloud Drive to finish syncing it."
 else
     echo "The vault was already mounted, so it will stay open."

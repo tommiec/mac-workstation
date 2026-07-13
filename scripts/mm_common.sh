@@ -14,14 +14,16 @@
 # =========================================================
 
 # ── Config ──────────────────────────────────────────────
-# SCRIPTS_DIR points to the scripts directory inside the repo.
-# All other scripts source this file and inherit SCRIPTS_DIR.
+# SCRIPTS_DIR points to the scripts directory inside the repo; REPO_ROOT is
+# derived from it so there is a single source of truth for the repo location.
+# All other scripts source this file and inherit these.
 
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPTS_DIR")"
 LOG_DIR="$HOME/Library/Logs/mac_manager"
 SCRIPT_STATUS_DIR="$LOG_DIR/status"
-REPO_ROOT="$HOME/Repositories/dev/mac-workstation"
 CONFIGS_DIR="$REPO_ROOT/configs"
+BREWFILE="$REPO_ROOT/Brewfile"
 LOCAL_GIT_HOOKS_DIR="$HOME/.config/git/hooks"
 LOCAL_GIT_EXCLUDES="$HOME/.config/git/ignore.local"
 BIN_DIR="$HOME/.local/bin"
@@ -30,11 +32,18 @@ MM_PATH="$BIN_DIR/mm"
 # Interactive shells usually learn this through brew shellenv. launchd does
 # not read shell profiles, so make the standard Homebrew locations available
 # to every Mac Manager script as soon as this shared file is sourced.
-if [[ -x /opt/homebrew/bin/brew ]]; then
-    export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
-elif [[ -x /usr/local/bin/brew ]]; then
-    export PATH="/usr/local/bin:/usr/local/sbin:$PATH"
-fi
+# ensure_brew reuses this after a fresh Homebrew install.
+load_brew_env() {
+    local brew_bin
+    for brew_bin in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        if [[ -x "$brew_bin" ]]; then
+            eval "$("$brew_bin" shellenv)"
+            return 0
+        fi
+    done
+    return 1
+}
+load_brew_env || true
 
 LAUNCH_AGENT_LABEL="local.mac-manager.auto-maintenance"
 LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LAUNCH_AGENT_LABEL}.plist"
@@ -46,94 +55,8 @@ AUTO_WEEKDAY=6
 AUTO_HOUR=2
 AUTO_MINUTE=0
 
-MANAGED_CASKS=(
-  # Development
-  dash
-  github
-  gitkraken
-  intellij-idea
-  postman
-  visual-studio-code
-
-  # AI / media
-  chatgpt
-  claude
-  macwhisper
-  vlc
-
-  # Communication / browser
-  discord
-  firefox
-  microsoft-teams
-
-  # Security / networking
-  balenaetcher
-  cyberduck
-  malwarebytes
-  wireshark-app
-
-  # System utilities
-  appcleaner
-  monitorcontrol
-  rectangle
-  utm
-
-  # Data / modeling
-  mysqlworkbench
-  visual-paradigm
-)
-
-CLI_TOOLS=(
-  # Development / shell productivity
-  bat
-  fd
-  fzf
-  gh
-  git
-  jq
-  mas
-  pre-commit
-  ripgrep
-  shellcheck
-  tmux
-  tree
-  yq
-
-  # Python / AI
-  ollama
-  pipx
-  uv
-
-  # DevOps / containers / cloud-native
-  docker
-  docker-compose
-  trivy
-
-  # Security / reverse engineering
-  burp
-  ghidra
-  john-jumbo
-  sqlmap
-  virustotal-cli
-
-  # Network / VPN
-  nmap
-  openvpn
-  wget
-  wireshark
-
-  # File / archive / document tools
-  dos2unix
-  exiftool
-  p7zip
-  pandoc
-  tesseract
-  tesseract-lang
-  weasyprint
-
-  # Cross-platform administration
-  powershell
-)
+# The managed app and CLI tool list lives in the repo-root Brewfile
+# ($BREWFILE) and is installed by mm_install.sh via 'brew bundle'.
 
 # ── Logging ─────────────────────────────────────────────
 
@@ -210,6 +133,12 @@ notify_user() {
     local message="$2"
     /usr/bin/osascript \
         -e "display notification \"${message//\"/\\\"}\" with title \"${title//\"/\\\"}\""
+}
+
+# Counts the lines that softwareupdate marks as available updates ('* Label').
+# grep -c prints 0 (and exits 1) when nothing matches; || true absorbs that.
+count_macos_updates() {
+    grep -cE '^[[:space:]]*\*' <<< "${1:-}" || true
 }
 
 # ── Keychain helpers ────────────────────────────────────
@@ -293,28 +222,81 @@ setup_git_global() {
 
 # ── Homebrew ────────────────────────────────────────────
 
+# Lists installed formulas/casks that are not declared in the Brewfile
+# (dry-run of 'brew bundle cleanup'). Empty output means nothing unmanaged.
+list_unmanaged_packages() {
+    [[ -f "$BREWFILE" ]] || return 0
+    brew bundle cleanup --file "$BREWFILE" 2>/dev/null || true
+}
+
 ensure_brew() {
     if ! command -v brew &>/dev/null; then
         echo "Installing Homebrew..."
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
             || return 1
+        # Homebrew's installer updates future login shells, but it cannot
+        # update this already-running process.
+        load_brew_env || return 1
+    fi
+    command -v brew &>/dev/null
+}
+
+# ── Encrypted vault (iCloud sparsebundle) ───────────────
+# Shared by the SSH and GPG backup scripts. Usage pattern:
+#   ensure_vault    → create the sparsebundle on first use
+#   vault_mount     → sets VAULT_MOUNT_POINT; VAULT_MOUNTED_BY_SCRIPT=1 when
+#                     this process mounted it (an already-open vault is reused
+#                     and left mounted)
+#   vault_eject     → call from the EXIT trap; only ejects what we mounted
+
+VAULT_PATH="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Secure Vault/Secrets.sparsebundle"
+VAULT_NAME="Secrets"
+VAULT_SIZE="2g"
+VAULT_MOUNT_POINT=""
+VAULT_MOUNTED_BY_SCRIPT=0
+
+ensure_vault() {
+    mkdir -p "$(dirname "$VAULT_PATH")" || return 1
+    if [[ ! -e "$VAULT_PATH" ]]; then
+        echo "Creating encrypted sparsebundle..."
+        echo "Choose a strong password and store it in your password manager."
+        echo
+        diskutil image create blank \
+            --encrypt \
+            --size "$VAULT_SIZE" \
+            --volumeName "$VAULT_NAME" \
+            --fs APFS \
+            "$VAULT_PATH" || return 1
+        echo
+    fi
+}
+
+vault_mount() {
+    local attach_out=""
+
+    if [[ -d "/Volumes/$VAULT_NAME" ]]; then
+        VAULT_MOUNT_POINT="/Volumes/$VAULT_NAME"
+        echo "Using already mounted vault: $VAULT_MOUNT_POINT"
+        return 0
     fi
 
-    # Homebrew's installer updates future login shells, but it cannot update
-    # this already-running process. Load the detected installation explicitly.
-    local brew_bin=""
-    if command -v brew &>/dev/null; then
-        brew_bin="$(command -v brew)"
-    elif [[ -x /opt/homebrew/bin/brew ]]; then
-        brew_bin="/opt/homebrew/bin/brew"
-    elif [[ -x /usr/local/bin/brew ]]; then
-        brew_bin="/usr/local/bin/brew"
-    else
+    echo "Mounting vault..."
+    attach_out="$(hdiutil attach "$VAULT_PATH" -nobrowse)" || return 1
+
+    # Take the mount point from the attach output instead of assuming
+    # /Volumes/$VAULT_NAME: macOS mounts at "$VAULT_NAME 1" on a name clash.
+    VAULT_MOUNT_POINT="$(sed -n 's|.*\(/Volumes/.*\)$|\1|p' <<< "$attach_out" | tail -n 1)"
+    if [[ -z "$VAULT_MOUNT_POINT" || ! -d "$VAULT_MOUNT_POINT" ]]; then
+        VAULT_MOUNT_POINT=""
         return 1
     fi
+    VAULT_MOUNTED_BY_SCRIPT=1
+}
 
-    eval "$("$brew_bin" shellenv)" || return 1
-    command -v brew &>/dev/null
+vault_eject() {
+    if [[ "$VAULT_MOUNTED_BY_SCRIPT" -eq 1 && -n "$VAULT_MOUNT_POINT" && -d "$VAULT_MOUNT_POINT" ]]; then
+        diskutil eject "$VAULT_MOUNT_POINT" >/dev/null 2>&1 || true
+    fi
 }
 
 # ── LaunchAgent ─────────────────────────────────────────
