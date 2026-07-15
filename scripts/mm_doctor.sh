@@ -234,45 +234,72 @@ echo "── 🦙 Ollama ──────────────────�
 if command -v ollama >/dev/null 2>&1; then
     check_ok "Ollama CLI found: $(command -v ollama)"
 else
-    check_fail "Ollama CLI not found"
+    check_warn "Ollama not installed — skipping checks"
 fi
 
-if [[ -f "$OLLAMA_SERVICE_PATH" ]]; then
-    check_ok "Ollama Homebrew service plist present"
-    if /usr/libexec/PlistBuddy -c "Print :EnvironmentVariables:OLLAMA_HOST" "$OLLAMA_SERVICE_PATH" 2>/dev/null \
-        | grep -Fxq "$OLLAMA_HOST"; then
-        check_ok "Ollama Homebrew service configured for LAN access at $OLLAMA_HOST"
-    else
-        check_fail "Ollama Homebrew service does not contain the expected LAN binding"
-    fi
-else
-    check_fail "Ollama Homebrew service plist missing: $OLLAMA_SERVICE_PATH"
-fi
-
-if launchctl print "gui/$(id -u)/$OLLAMA_SERVICE_LABEL" >/dev/null 2>&1; then
-    check_ok "Ollama Homebrew service loaded: $OLLAMA_SERVICE_LABEL"
-else
-    check_fail "Ollama Homebrew service not loaded: $OLLAMA_SERVICE_LABEL"
-fi
-
-if curl -fsS "$OLLAMA_LOCAL_API/api/version" >/dev/null 2>&1; then
-    check_ok "Ollama API responding locally"
-
-    OLLAMA_MISSING_MODELS=0
-    for model in "${OLLAMA_MODELS[@]}"; do
-        if ollama show "$model" >/dev/null 2>&1; then
-            check_ok "Ollama model present: $model"
+if command -v ollama >/dev/null 2>&1; then
+    if [[ -f "$OLLAMA_SERVICE_PATH" ]]; then
+        check_ok "Ollama Mac Manager service plist present"
+        OLLAMA_EXPECTED_PLIST="$(mktemp "${TMPDIR:-/tmp}/mm-doctor-ollama.XXXXXX" 2>/dev/null || true)"
+        if [[ -n "$OLLAMA_EXPECTED_PLIST" ]] \
+            && write_ollama_launch_agent "$OLLAMA_EXPECTED_PLIST" \
+            && cmp -s "$OLLAMA_EXPECTED_PLIST" "$OLLAMA_SERVICE_PATH"; then
+            check_ok "Ollama service plist matches all managed settings"
         else
-            check_warn "Ollama model missing: $model — run 'mm install'"
-            OLLAMA_MISSING_MODELS=$((OLLAMA_MISSING_MODELS + 1))
+            check_fail "Ollama service plist differs from the managed configuration"
         fi
-    done
-
-    if [[ "$OLLAMA_MISSING_MODELS" -eq 0 ]]; then
-        check_ok "All managed Ollama models installed"
+        [[ -n "$OLLAMA_EXPECTED_PLIST" ]] && rm -f "$OLLAMA_EXPECTED_PLIST"
+    else
+        check_fail "Ollama Mac Manager service plist missing: $OLLAMA_SERVICE_PATH"
     fi
-else
-    check_fail "Ollama API not responding at $OLLAMA_LOCAL_API"
+
+    if launchctl print "gui/$(id -u)/$OLLAMA_SERVICE_LABEL" >/dev/null 2>&1; then
+        check_ok "Ollama Mac Manager service loaded: $OLLAMA_SERVICE_LABEL"
+    else
+        check_fail "Ollama Mac Manager service not loaded: $OLLAMA_SERVICE_LABEL"
+    fi
+
+    if launchctl print "gui/$(id -u)/$OLLAMA_HOMEBREW_SERVICE_LABEL" >/dev/null 2>&1; then
+        check_fail "Conflicting Ollama Homebrew service is loaded: $OLLAMA_HOMEBREW_SERVICE_LABEL"
+    else
+        check_ok "No conflicting Ollama Homebrew service loaded"
+    fi
+
+    if /usr/sbin/lsof -nP -iTCP:11434 -sTCP:LISTEN 2>/dev/null | grep -q 'TCP \*:11434 (LISTEN)'; then
+        check_ok "Ollama LAN binding active on *:11434"
+    else
+        check_fail "Ollama is not actively listening on the LAN at *:11434"
+    fi
+
+    OLLAMA_SERVER_VERSION="$(ollama_server_version)"
+    if [[ -n "$OLLAMA_SERVER_VERSION" ]]; then
+        check_ok "Ollama API responding locally (server $OLLAMA_SERVER_VERSION)"
+
+        OLLAMA_CLI_VERSION="$(ollama_cli_version)"
+        if [[ -z "$OLLAMA_CLI_VERSION" ]]; then
+            check_warn "Could not determine the installed Ollama CLI version"
+        elif [[ "$OLLAMA_CLI_VERSION" == "$OLLAMA_SERVER_VERSION" ]]; then
+            check_ok "Ollama CLI and server versions match: $OLLAMA_CLI_VERSION"
+        else
+            check_warn "Ollama server $OLLAMA_SERVER_VERSION differs from CLI $OLLAMA_CLI_VERSION — restart required"
+        fi
+
+        OLLAMA_MISSING_MODELS=0
+        for model in "${OLLAMA_MODELS[@]}"; do
+            if ollama show "$model" >/dev/null 2>&1; then
+                check_ok "Ollama model present: $model"
+            else
+                check_warn "Ollama model missing: $model — run 'mm install'"
+                OLLAMA_MISSING_MODELS=$((OLLAMA_MISSING_MODELS + 1))
+            fi
+        done
+
+        if [[ "$OLLAMA_MISSING_MODELS" -eq 0 ]]; then
+            check_ok "All managed Ollama models installed"
+        fi
+    else
+        check_fail "Ollama API not responding at $OLLAMA_LOCAL_API"
+    fi
 fi
 
 # ── Secrets & SSH ───────────────────────────────────────

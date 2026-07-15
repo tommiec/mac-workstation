@@ -80,11 +80,11 @@ Normal script changes are active directly after `git pull`. Run `mm install` onl
 
 ### Ollama for the local network
 
-`mm install` starts Ollama through its native Homebrew service
-(`homebrew.mxcl.ollama`) and listens on all network interfaces at port `11434`.
-There is deliberately no second Mac Manager Ollama service. The installer adds
-the LAN and memory settings to Homebrew's generated service plist, reloads that
-same service, and then installs these models when missing:
+Homebrew installs the Ollama binary. `mm install` stops Homebrew's optional
+service and registers one Mac Manager-owned LaunchAgent
+(`local.mac-manager.ollama`) that listens on all network interfaces at port
+`11434`. Its settings cannot be overwritten by `brew services` or an Ollama
+upgrade. The installer then installs these models when missing:
 
 ```text
 devstral:24b
@@ -112,13 +112,34 @@ to one loaded model and one parallel request. This is intentional for a Mac
 with 36 GB unified memory: every managed model fits individually without trying
 to keep multiple 14–19 GB model images resident at once.
 
+Mac Manager owns the persistent configuration at
+`~/Library/LaunchAgents/local.mac-manager.ollama.plist`. `RunAtLoad` and
+`KeepAlive` make it start after login and restart after a crash. `mm auto`
+compares the running server version with the installed CLI and restarts a loaded
+agent when they differ, including after a manual or partially failed Homebrew
+upgrade. Re-running `mm install` leaves an identical loaded service untouched,
+so active models and NAS requests are not interrupted.
+
 Ollama's local API has no authentication. Binding it to `0.0.0.0:11434`
 therefore makes model execution available to every device that can reach that
 port. Use this only on a trusted LAN, do not forward port `11434` on the router,
 and restrict access with the macOS firewall or a separate authenticated reverse
-proxy when needed. The Mac must be logged in and awake because `brew services`
-runs Ollama as a user LaunchAgent; reserving its LAN address in DHCP keeps the
-NAS endpoint stable.
+proxy when needed. The Mac must be logged in and awake because Ollama runs as a
+user LaunchAgent; reserving its LAN address in DHCP keeps the NAS endpoint
+stable. Remember that a MacBook roams: on café, hotel, or guest Wi-Fi, the
+unauthenticated API is exposed to peers on that network too. Stop it before
+leaving a trusted LAN with:
+
+```bash
+launchctl bootout "gui/$(id -u)/local.mac-manager.ollama"
+```
+
+Start it again from its persistent configuration with:
+
+```bash
+launchctl bootstrap "gui/$(id -u)" \
+  "$HOME/Library/LaunchAgents/local.mac-manager.ollama.plist"
+```
 
 ### Local Git config bootstrap
 
@@ -251,6 +272,8 @@ Unmount the vault after use and let iCloud Drive finish syncing before shutting 
 
 - Uses a LaunchAgent (user context, no root daemon)
 - Writes logs and last-run status under `~/Library/Logs/mac_manager/`
+- Weekly maintenance removes `auto_*.log` and `maintain_*.log` files older than
+  60 days and truncates Ollama output logs when they exceed 50 MiB
 - Safe to re-run `mm install` at any time, but usually only needed after installer-managed setup changes
 - `mm doctor` can be used to validate the setup and inspect the last recorded run for each script
 - `mm doctor` is read-only: it reports drift (including whether the checkout is behind GitHub) but never changes the system; updating happens via `git pull --ff-only` or the weekly auto run
