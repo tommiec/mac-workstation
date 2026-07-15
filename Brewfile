@@ -30,6 +30,7 @@ cask "wireshark-app"
 
 # ── Casks: System utilities ─────────────────────────────
 cask "appcleaner"
+cask "keepingyouawake"
 cask "monitorcontrol"
 cask "rectangle"
 cask "utm"
