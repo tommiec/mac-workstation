@@ -49,12 +49,16 @@ LAUNCH_AGENT_LABEL="local.mac-manager.auto-maintenance"
 LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LAUNCH_AGENT_LABEL}.plist"
 LEGACY_LAUNCH_AGENT_LABEL="local.mac.auto-maintenance"
 LEGACY_LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LEGACY_LAUNCH_AGENT_LABEL}.plist"
-OLLAMA_SERVICE_LABEL="homebrew.mxcl.ollama"
+OLLAMA_SERVICE_LABEL="local.mac-manager.ollama"
 OLLAMA_SERVICE_PATH="$HOME/Library/LaunchAgents/${OLLAMA_SERVICE_LABEL}.plist"
+OLLAMA_HOMEBREW_SERVICE_LABEL="homebrew.mxcl.ollama"
+OLLAMA_HOMEBREW_SERVICE_PATH="$HOME/Library/LaunchAgents/${OLLAMA_HOMEBREW_SERVICE_LABEL}.plist"
 OLLAMA_HOST="0.0.0.0:11434"
 OLLAMA_LOCAL_API="http://127.0.0.1:11434"
 OLLAMA_PULL_MAX_ATTEMPTS=4
 OLLAMA_PULL_RETRY_DELAY=10
+LOG_RETENTION_DAYS=60
+OLLAMA_LOG_MAX_BYTES=$((50 * 1024 * 1024))
 
 OLLAMA_MODELS=(
   devstral:24b
@@ -399,60 +403,126 @@ load_auto_launch_agent() {
     fi
 }
 
-# ── Ollama Homebrew service ─────────────────────────────
+# ── Ollama LaunchAgent ──────────────────────────────────
 
-set_plist_environment_value() {
-    local plist="$1"
-    local key="$2"
-    local value="$3"
+write_ollama_launch_agent() {
+    local ollama_bin=""
+    local destination="${1:-$OLLAMA_SERVICE_PATH}"
 
-    if /usr/libexec/PlistBuddy -c "Print :EnvironmentVariables:$key" "$plist" >/dev/null 2>&1; then
-        /usr/libexec/PlistBuddy -c "Set :EnvironmentVariables:$key $value" "$plist"
-    else
-        /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:$key string $value" "$plist"
-    fi
-}
-
-plist_environment_value_equals() {
-    local plist="$1"
-    local key="$2"
-    local expected="$3"
-    local actual=""
-
-    actual="$(/usr/libexec/PlistBuddy -c "Print :EnvironmentVariables:$key" "$plist" 2>/dev/null || true)"
-    [[ "$actual" == "$expected" ]]
-}
-
-configure_ollama_homebrew_service() {
     command -v brew >/dev/null 2>&1 || return 1
     command -v ollama >/dev/null 2>&1 || return 1
+    ollama_bin="$(brew --prefix 2>/dev/null)/opt/ollama/bin/ollama"
+    [[ -x "$ollama_bin" ]] || return 1
 
-    # Homebrew remains the sole service owner and generates the service plist.
-    # Mac Manager only adds settings that the formula itself does not expose.
-    if [[ ! -f "$OLLAMA_SERVICE_PATH" ]]; then
-        brew services start ollama >/dev/null 2>&1 || return 1
+    mkdir -p "$(dirname "$destination")"
+    cat > "$destination" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>$OLLAMA_SERVICE_LABEL</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$ollama_bin</string>
+        <string>serve</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>OLLAMA_HOST</key>
+        <string>$OLLAMA_HOST</string>
+        <key>OLLAMA_FLASH_ATTENTION</key>
+        <string>1</string>
+        <key>OLLAMA_KV_CACHE_TYPE</key>
+        <string>q8_0</string>
+        <key>OLLAMA_MAX_LOADED_MODELS</key>
+        <string>1</string>
+        <key>OLLAMA_NUM_PARALLEL</key>
+        <string>1</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    <key>StandardOutPath</key>
+    <string>$LOG_DIR/ollama.out</string>
+    <key>StandardErrorPath</key>
+    <string>$LOG_DIR/ollama.err</string>
+</dict>
+</plist>
+EOF
+
+    plutil -lint "$destination" >/dev/null
+}
+
+disable_ollama_homebrew_service() {
+    if /bin/launchctl print "gui/$(id -u)/$OLLAMA_HOMEBREW_SERVICE_LABEL" >/dev/null 2>&1 \
+        || [[ -e "$OLLAMA_HOMEBREW_SERVICE_PATH" ]]; then
+        brew services stop ollama >/dev/null 2>&1 || true
+        /bin/launchctl bootout "gui/$(id -u)/$OLLAMA_HOMEBREW_SERVICE_LABEL" >/dev/null 2>&1 || true
+        rm -f "$OLLAMA_HOMEBREW_SERVICE_PATH" 2>/dev/null || true
     fi
-    [[ -f "$OLLAMA_SERVICE_PATH" ]] || return 1
+}
 
-    if /bin/launchctl print "gui/$(id -u)/$OLLAMA_SERVICE_LABEL" >/dev/null 2>&1 \
-        && plist_environment_value_equals "$OLLAMA_SERVICE_PATH" OLLAMA_HOST "$OLLAMA_HOST" \
-        && plist_environment_value_equals "$OLLAMA_SERVICE_PATH" OLLAMA_FLASH_ATTENTION 1 \
-        && plist_environment_value_equals "$OLLAMA_SERVICE_PATH" OLLAMA_KV_CACHE_TYPE q8_0 \
-        && plist_environment_value_equals "$OLLAMA_SERVICE_PATH" OLLAMA_MAX_LOADED_MODELS 1 \
-        && plist_environment_value_equals "$OLLAMA_SERVICE_PATH" OLLAMA_NUM_PARALLEL 1; then
+load_ollama_launch_agent() {
+    # Homebrew supplies the binary; Mac Manager exclusively owns the service.
+    mkdir -p "$LOG_DIR"
+    disable_ollama_homebrew_service
+
+    /bin/launchctl bootout "gui/$(id -u)/$OLLAMA_SERVICE_LABEL" >/dev/null 2>&1 || true
+    /bin/launchctl enable "gui/$(id -u)/$OLLAMA_SERVICE_LABEL" || return 1
+    /bin/launchctl bootstrap "gui/$(id -u)" "$OLLAMA_SERVICE_PATH" || return 1
+    /bin/launchctl print "gui/$(id -u)/$OLLAMA_SERVICE_LABEL" >/dev/null 2>&1
+}
+
+configure_ollama_service() {
+    local candidate=""
+
+    candidate="$(mktemp "${TMPDIR:-/tmp}/mm-ollama-plist.XXXXXX")" || return 1
+    if ! write_ollama_launch_agent "$candidate"; then
+        rm -f "$candidate"
+        return 1
+    fi
+
+    disable_ollama_homebrew_service
+
+    if [[ -f "$OLLAMA_SERVICE_PATH" ]] \
+        && cmp -s "$candidate" "$OLLAMA_SERVICE_PATH" \
+        && /bin/launchctl print "gui/$(id -u)/$OLLAMA_SERVICE_LABEL" >/dev/null 2>&1; then
+        rm -f "$candidate"
         return 0
     fi
 
-    /bin/launchctl bootout "gui/$(id -u)/$OLLAMA_SERVICE_LABEL" >/dev/null 2>&1 || true
-    set_plist_environment_value "$OLLAMA_SERVICE_PATH" OLLAMA_HOST "$OLLAMA_HOST" || return 1
-    set_plist_environment_value "$OLLAMA_SERVICE_PATH" OLLAMA_FLASH_ATTENTION 1 || return 1
-    set_plist_environment_value "$OLLAMA_SERVICE_PATH" OLLAMA_KV_CACHE_TYPE q8_0 || return 1
-    set_plist_environment_value "$OLLAMA_SERVICE_PATH" OLLAMA_MAX_LOADED_MODELS 1 || return 1
-    set_plist_environment_value "$OLLAMA_SERVICE_PATH" OLLAMA_NUM_PARALLEL 1 || return 1
-    plutil -lint "$OLLAMA_SERVICE_PATH" >/dev/null || return 1
+    if ! cp "$candidate" "$OLLAMA_SERVICE_PATH"; then
+        rm -f "$candidate"
+        return 1
+    fi
+    rm -f "$candidate"
+    load_ollama_launch_agent
+}
 
-    /bin/launchctl bootstrap "gui/$(id -u)" "$OLLAMA_SERVICE_PATH" || return 1
-    /bin/launchctl print "gui/$(id -u)/$OLLAMA_SERVICE_LABEL" >/dev/null 2>&1
+restart_ollama_service() {
+    /bin/launchctl kickstart -k "gui/$(id -u)/$OLLAMA_SERVICE_LABEL"
+}
+
+ollama_cli_version() {
+    local version_output=""
+    local client_version=""
+
+    version_output="$(ollama --version 2>&1 || true)"
+    client_version="$(sed -nE 's/.*client version is ([^[:space:]]+).*/\1/p' <<< "$version_output" | tail -n 1)"
+    if [[ -n "$client_version" ]]; then
+        printf '%s\n' "$client_version"
+    else
+        sed -nE 's/.*ollama version is ([^[:space:]]+).*/\1/p' <<< "$version_output" | tail -n 1
+    fi
+}
+
+ollama_server_version() {
+    curl -fsS "$OLLAMA_LOCAL_API/api/version" 2>/dev/null \
+        | sed -nE 's/.*"version":"([^"]+)".*/\1/p'
 }
 
 wait_for_ollama() {

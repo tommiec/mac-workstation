@@ -99,13 +99,21 @@ else
     log_warn "brew unavailable — skipping brew steps"
 fi
 
-# Homebrew may regenerate its service plist during an Ollama upgrade. Reapply
-# the managed LAN/memory settings to that same Homebrew-owned service.
-if command -v ollama >/dev/null 2>&1; then
-    if configure_ollama_homebrew_service && wait_for_ollama; then
-        log_ok "Ollama Homebrew service configured"
-    else
-        log_warn "Ollama Homebrew service configuration failed"
+# Detect upgrades by observed state, independent of who ran `brew upgrade` or
+# whether another formula made a bulk upgrade return a failure. A deliberately
+# stopped service stays stopped because kickstart is only considered when the
+# Mac Manager LaunchAgent is loaded.
+if command -v ollama >/dev/null 2>&1 \
+    && /bin/launchctl print "gui/$(id -u)/$OLLAMA_SERVICE_LABEL" >/dev/null 2>&1; then
+    OLLAMA_CLI_VERSION="$(ollama_cli_version)"
+    OLLAMA_SERVER_VERSION="$(ollama_server_version)"
+    if [[ -n "$OLLAMA_CLI_VERSION" && -n "$OLLAMA_SERVER_VERSION" \
+        && "$OLLAMA_CLI_VERSION" != "$OLLAMA_SERVER_VERSION" ]]; then
+        if restart_ollama_service && wait_for_ollama; then
+            log_ok "Ollama restarted after version change ($OLLAMA_SERVER_VERSION → $OLLAMA_CLI_VERSION)"
+        else
+            log_warn "Ollama restart after version change failed"
+        fi
     fi
 fi
 
@@ -144,6 +152,25 @@ DELETED=$(
     | /usr/bin/tr -d ' '
 )
 log_ok "$DELETED old cache file(s) deleted"
+
+OLD_LOG_COUNT=$(
+    /usr/bin/find "$LOG_DIR" \
+        -type f \( -name 'auto_*.log' -o -name 'maintain_*.log' \) \
+        -mtime "+$LOG_RETENTION_DAYS" \
+        -print -delete 2>/dev/null \
+    | /usr/bin/wc -l \
+    | /usr/bin/tr -d ' '
+)
+
+TRUNCATED_LOG_COUNT=0
+for service_log in "$LOG_DIR/ollama.out" "$LOG_DIR/ollama.err"; do
+    if [[ -f "$service_log" ]] \
+        && [[ "$(/usr/bin/stat -f '%z' "$service_log" 2>/dev/null || echo 0)" -gt "$OLLAMA_LOG_MAX_BYTES" ]]; then
+        : > "$service_log"
+        TRUNCATED_LOG_COUNT=$((TRUNCATED_LOG_COUNT + 1))
+    fi
+done
+log_ok "$OLD_LOG_COUNT manager log(s) older than $LOG_RETENTION_DAYS days deleted; $TRUNCATED_LOG_COUNT oversized Ollama log(s) truncated"
 
 notify_user "Mac Manager completed" "Maintenance finished."
 

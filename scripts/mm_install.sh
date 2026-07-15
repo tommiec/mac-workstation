@@ -134,12 +134,12 @@ echo
 echo "── 🦙 Ollama ─────────────────────────────────────"
 
 OLLAMA_READY=0
-if configure_ollama_homebrew_service && wait_for_ollama; then
+if configure_ollama_service && wait_for_ollama; then
     OLLAMA_READY=1
-    log_ok "Ollama Homebrew service running at $OLLAMA_HOST"
+    log_ok "Ollama Mac Manager service running at $OLLAMA_HOST"
     log_info "Ollama has no API authentication; expose it only on a trusted LAN"
 else
-    log_warn "Ollama Homebrew service setup failed"
+    log_warn "Ollama Mac Manager service setup failed"
 fi
 
 if [[ "$OLLAMA_READY" -eq 1 ]]; then
