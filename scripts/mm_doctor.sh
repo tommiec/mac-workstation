@@ -202,14 +202,16 @@ if command -v brew >/dev/null 2>&1; then
     if [[ "${OUTDATED_COUNT:-0}" -eq 0 ]]; then
         check_ok "No outdated Homebrew packages"
     else
-        check_warn "$OUTDATED_COUNT outdated Homebrew package(s)"
+        check_warn "$OUTDATED_COUNT outdated Homebrew package(s) — run 'mm maintain'"
     fi
 
     if [[ -f "$BREWFILE" ]]; then
-        if brew bundle check --file "$BREWFILE" >/dev/null 2>&1; then
+        MISSING_PACKAGES="$(list_missing_brewfile_packages)"
+        if [[ -z "$MISSING_PACKAGES" ]]; then
             check_ok "All Brewfile packages installed"
         else
-            check_warn "Brewfile packages missing — run 'mm install'"
+            check_warn "Brewfile packages not installed — run 'mm install':"
+            echo "$MISSING_PACKAGES" | sed 's/^/      /'
         fi
 
         UNMANAGED="$(list_unmanaged_packages)"
