@@ -239,6 +239,27 @@ setup_git_global() {
 
 # ── Homebrew ────────────────────────────────────────────
 
+# Lists Brewfile entries that are not installed at all, as "formula NAME" or
+# "cask NAME". Deliberately not 'brew bundle check': that reports outdated
+# packages as needing action too, while 'mm install' runs --no-upgrade and
+# only ever installs what is missing. Upgrades belong to mm maintain/auto.
+list_missing_brewfile_packages() {
+    [[ -f "$BREWFILE" ]] || return 0
+
+    local installed_formulae installed_casks kind name
+    installed_formulae="$(brew list --formula 2>/dev/null)"
+    installed_casks="$(brew list --cask 2>/dev/null)"
+
+    while read -r kind name; do
+        # brew list prints short names, so drop any tap prefix first.
+        name="${name##*/}"
+        case "$kind" in
+            brew) grep -Fxq "$name" <<< "$installed_formulae" || echo "formula $name" ;;
+            cask) grep -Fxq "$name" <<< "$installed_casks" || echo "cask $name" ;;
+        esac
+    done < <(sed -nE 's/^[[:space:]]*(brew|cask)[[:space:]]+"([^"]+)".*/\1 \2/p' "$BREWFILE")
+}
+
 # Lists installed formulas/casks that are not declared in the Brewfile
 # (dry-run of 'brew bundle cleanup'). Empty output means nothing unmanaged.
 # Only the package sections are kept: the dry-run also prints cache-cleanup
