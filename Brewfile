@@ -25,6 +25,7 @@ cask "microsoft-teams"
 cask "balenaetcher"
 cask "burp-suite"
 cask "cyberduck"
+cask "gpg-suite"
 cask "malwarebytes"
 cask "wireshark-app"
 
