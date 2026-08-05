@@ -4,6 +4,7 @@
 
 # ── Casks: Development ──────────────────────────────────
 cask "dash"
+cask "docker-desktop"
 cask "github"
 cask "gitkraken"
 cask "intellij-idea"
