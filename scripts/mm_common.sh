@@ -516,7 +516,10 @@ configure_ollama_service() {
         return 0
     fi
 
-    if ! cp "$candidate" "$OLLAMA_SERVICE_PATH"; then
+    # write_ollama_launch_agent only created the temp file's directory, so make
+    # sure ~/Library/LaunchAgents exists before copying into it.
+    if ! mkdir -p "$(dirname "$OLLAMA_SERVICE_PATH")" \
+        || ! cp "$candidate" "$OLLAMA_SERVICE_PATH"; then
         rm -f "$candidate"
         return 1
     fi
