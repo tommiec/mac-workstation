@@ -217,9 +217,10 @@ install_managed_git_config() {
 
 # Installs the per-forge identity files and the conditional includes that pick
 # between them, from $GIT_PROFILE_CONF. Identity is deliberately never set
-# globally: user.useConfigOnly makes git fail loudly when a repo's remote
-# matches no rule, instead of committing under an address guessed from the
-# hostname. Policy: ~/Repositories/GIT.md
+# globally: it follows the remote, and setup_git_global's user.useConfigOnly
+# makes git fail loudly when a repo's remote matches no rule instead of
+# committing under an address guessed from the hostname.
+# Policy: ~/Repositories/GIT.md
 #
 # The name, email and forge URLs are personal data and internal network
 # topology, so they live in that one machine-local file — kept in the encrypted
@@ -254,19 +255,15 @@ install_managed_git_identity() {
     local forge name email url identity_file
     local default_name default_email
 
-    # These two hold regardless of the profile, and the first one is the safety
-    # property: without an identity git must refuse to commit rather than invent
-    # an address from the hostname.
-    git config --global user.useConfigOnly true || return 1
-    git config --global credential.helper osxkeychain || return 1
-
     # A fresh Mac has no profile yet: 'mm restore' needs rsync, gpg and the mm
-    # command, so the installer necessarily runs first. Treat that as a step
-    # still to come, not a failure — failing here would deadlock the bootstrap.
+    # command, so the installer necessarily runs before any profile can exist.
+    # Defer instead of failing — failing here would deadlock the bootstrap — and
+    # never invent an identity: not from the .example file, and never a global
+    # name or email. The safety keys in setup_git_global already guarantee that a
+    # machine in this state refuses to commit rather than guessing an address.
     if [[ ! -f "$GIT_PROFILE_CONF" ]]; then
-        log_info "No git profile yet at $GIT_PROFILE_CONF"
-        log_info "Restore it with 'mm restore --git-profile --apply', then re-run 'mm install'"
-        log_info "Until then git refuses to commit, by design (see ~/Repositories/GIT.md)"
+        log_warn "Git identity deferred: restore git-profile.conf with 'mm restore --git-profile --apply', then rerun 'mm install'"
+        log_info "Until then git refuses every commit — fail-closed by design, see ~/Repositories/GIT.md"
         return 0
     fi
 
@@ -366,6 +363,13 @@ setup_git_global() {
 
     mkdir -p "$LOCAL_GIT_HOOKS_DIR" || return 1
     git config --global core.hooksPath "$LOCAL_GIT_HOOKS_DIR" || return 1
+
+    # Installed unconditionally, because the safety property must hold from the
+    # first minute of a fresh machine: with useConfigOnly and no matching
+    # identity rule, git refuses to commit instead of inventing an address from
+    # the hostname. Only the identity itself depends on a restored profile.
+    git config --global user.useConfigOnly true || return 1
+    git config --global credential.helper osxkeychain || return 1
 
     install_managed_git_identity || return 1
 }
