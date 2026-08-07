@@ -15,6 +15,8 @@ cask "zed"
 # ── Casks: AI / media ───────────────────────────────────
 cask "chatgpt"
 cask "claude"
+# google-gemini, not "gemini" — that cask is MacPaw's duplicate file cleaner.
+cask "google-gemini"
 cask "macwhisper"
 cask "vlc"
 
