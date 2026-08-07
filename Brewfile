@@ -52,7 +52,8 @@ brew "ollama"
 brew "uv"
 
 # ── CLI: DevOps / containers / cloud-native ─────────────
-brew "docker"
+# docker CLI: shipped by the docker-desktop cask, not the formula (they fight
+# over the same symlinks in the Homebrew prefix).
 brew "docker-compose"
 brew "trivy"
 
@@ -64,7 +65,8 @@ brew "virustotal-cli"
 # ── CLI: Network ────────────────────────────────────────
 brew "nmap"
 brew "wget"
-brew "wireshark"
+# wireshark CLI (tshark, dumpcap, editcap, ...): shipped by the wireshark-app
+# cask, not the formula (they fight over the same symlinks).
 
 # ── CLI: File / archive / document tools ────────────────
 brew "dos2unix"
