@@ -62,7 +62,8 @@ else
     check_fail "Repo scripts folder missing: $REPO_ROOT/scripts"
 fi
 
-for f in mm_common.sh mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh mm_backup_ssh.sh mm_backup_gpg.sh; do
+for f in mm_common.sh mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh \
+    mm_backup_ssh.sh mm_backup_gpg.sh mm_backup_git.sh mm_restore.sh mm_selftest.sh; do
     FILE_PATH="$REPO_ROOT/scripts/$f"
     if [[ -f "$FILE_PATH" ]]; then
         check_ok "$f present"
@@ -557,7 +558,8 @@ fi
 
 echo
 echo "── 🧾 Last script runs ───────────────────────────"
-for script in mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh mm_backup_ssh.sh mm_backup_gpg.sh; do
+for script in mm_auto.sh mm_maintain.sh mm_install.sh mm_doctor.sh mm_triage.sh \
+    mm_backup_ssh.sh mm_backup_gpg.sh mm_backup_git.sh mm_selftest.sh; do
     STATUS_FILE="$SCRIPT_STATUS_DIR/$script.status"
 
     if [[ ! -f "$STATUS_FILE" ]]; then

@@ -32,7 +32,7 @@
 # so pushing asks you to authenticate again after a restore.
 #
 # This is the counterpart of mm_backup_ssh.sh, mm_backup_gpg.sh and
-# mm_backup_git_profile.sh.
+# mm_backup_git.sh.
 # =========================================================
 
 set -o pipefail

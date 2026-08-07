@@ -23,7 +23,7 @@ One-time setup. Runs automatically. Manual control when needed.
 | `mm_triage.sh` | Quick file/malware triage with hash, VirusTotal and strings (`mm triage`) |
 | `mm_backup_ssh.sh` | Backup `~/.ssh` to an encrypted iCloud sparsebundle (called by `mm maintain`) |
 | `mm_backup_gpg.sh` | Backup GPG keys, ownertrust and `~/.gnupg` to the encrypted iCloud sparsebundle |
-| `mm_backup_git_profile.sh` | Backup the git commit identity to the encrypted iCloud sparsebundle (called by `mm maintain`) |
+| `mm_backup_git.sh` | Backup the git commit identity to the encrypted iCloud sparsebundle (called by `mm maintain`) |
 | `mm_restore.sh` | Restore SSH material, GPG material and the git identity from the vault onto a new Mac (`mm restore`, dry run by default) |
 | `mm_selftest.sh` | Assert that the git identity hooks refuse what the policy forbids (`mm selftest`) |
 | `mm_common.sh` | Shared configuration and helpers |
