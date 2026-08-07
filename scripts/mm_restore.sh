@@ -31,7 +31,8 @@
 # Forge credentials live in the Keychain and are deliberately NOT in the vault,
 # so pushing asks you to authenticate again after a restore.
 #
-# This is the counterpart of mm_backup_ssh.sh and mm_backup_gpg.sh.
+# This is the counterpart of mm_backup_ssh.sh, mm_backup_gpg.sh and
+# mm_backup_git_profile.sh.
 # =========================================================
 
 set -o pipefail

@@ -199,6 +199,28 @@ else
     log_info "GPG backup skipped"
 fi
 
+# ── Git profile backup ───────────────────
+# Its own step, not part of the SSH or GPG runs: those abort when ~/.ssh or a
+# keyring is missing, which would leave the commit identity out of the vault on
+# a machine that has neither.
+echo
+echo "── 🪪  Git profile backup ────────────────────────"
+
+if [[ ! -f "$GIT_PROFILE_CONF" ]]; then
+    log_info "No git profile on this machine; nothing to back up"
+else
+    read -r -p "   Backup the git commit identity to encrypted iCloud vault? (y/N): " confirm_git_profile
+    if [[ "$confirm_git_profile" =~ ^[Yy]$ ]]; then
+        if bash "$SCRIPT_DIR/mm_backup_git_profile.sh"; then
+            log_ok "Git profile backup completed"
+        else
+            log_warn "Git profile backup failed"
+        fi
+    else
+        log_info "Git profile backup skipped"
+    fi
+fi
+
 clear_quicktime_history() {
     local recents_dir="$HOME/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments"
     local quicktime_running=""
