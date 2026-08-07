@@ -211,7 +211,7 @@ if [[ ! -f "$GIT_PROFILE_CONF" ]]; then
 else
     read -r -p "   Backup the git commit identity to encrypted iCloud vault? (y/N): " confirm_git_profile
     if [[ "$confirm_git_profile" =~ ^[Yy]$ ]]; then
-        if bash "$SCRIPT_DIR/mm_backup_git_profile.sh"; then
+        if bash "$SCRIPT_DIR/mm_backup_git.sh"; then
             log_ok "Git profile backup completed"
         else
             log_warn "Git profile backup failed"

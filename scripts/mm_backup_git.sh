@@ -1,6 +1,6 @@
 #!/bin/bash
 # =========================================================
-# mm_backup_git_profile.sh
+# mm_backup_git.sh
 # Mirror ~/.config/git/git-profile.conf into git-profile/ inside the encrypted
 # iCloud sparsebundle.
 #
@@ -47,7 +47,7 @@ fi
 cleanup() {
     local status="$1"
     vault_eject
-    record_script_result "mm_backup_git_profile.sh" "$status"
+    record_script_result "mm_backup_git.sh" "$status"
 }
 trap 'status=$?; cleanup "$status"' EXIT
 
