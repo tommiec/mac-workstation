@@ -1,0 +1,9 @@
+#!/bin/sh
+# Identity guard for outgoing commits: checks the author and committer of every
+# commit that is about to reach a forge.
+#
+# stdin carries the pre-push ref lines and is passed through to the shared
+# check.
+
+hook_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+exec "$hook_dir/git-profile-check" push
