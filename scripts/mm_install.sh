@@ -116,7 +116,7 @@ setup_mm_command_path() {
 }
 
 run_step "mm command PATH setup" setup_mm_command_path
-run_step "git global exclude setup" setup_git_global
+run_step "git excludes, hooks and identity setup" setup_git_global
 
 # ── Install apps ─────────────────────
 # The full app and CLI tool list is declarative in the Brewfile; brew bundle

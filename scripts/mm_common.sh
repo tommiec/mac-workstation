@@ -254,11 +254,20 @@ install_managed_git_identity() {
     local forge name email url identity_file
     local default_name default_email
 
+    # These two hold regardless of the profile, and the first one is the safety
+    # property: without an identity git must refuse to commit rather than invent
+    # an address from the hostname.
+    git config --global user.useConfigOnly true || return 1
+    git config --global credential.helper osxkeychain || return 1
+
+    # A fresh Mac has no profile yet: 'mm restore' needs rsync, gpg and the mm
+    # command, so the installer necessarily runs first. Treat that as a step
+    # still to come, not a failure — failing here would deadlock the bootstrap.
     if [[ ! -f "$GIT_PROFILE_CONF" ]]; then
-        echo "Git profile not found: $GIT_PROFILE_CONF" >&2
-        echo "Restore it with 'mm restore --apply', or create it from" >&2
-        echo "configs/git-profile.conf.example." >&2
-        return 1
+        log_info "No git profile yet at $GIT_PROFILE_CONF"
+        log_info "Restore it with 'mm restore --git-profile --apply', then re-run 'mm install'"
+        log_info "Until then git refuses to commit, by design (see ~/Repositories/GIT.md)"
+        return 0
     fi
 
     chmod 600 "$GIT_PROFILE_CONF" 2>/dev/null || true
@@ -290,9 +299,6 @@ install_managed_git_identity() {
                 "~/.config/git/identity-$forge" || return 1
         done < <(git config --file "$GIT_PROFILE_CONF" --get-all "forge.$forge.url" 2>/dev/null)
     done < <(git_profile_forges)
-
-    git config --global user.useConfigOnly true || return 1
-    git config --global credential.helper osxkeychain || return 1
 }
 
 # Mirrors the git profile into the vault, next to the SSH and GPG material.

@@ -319,6 +319,12 @@ git clone https://github.com/tommiec/mac-workstation.git ~/Repositories/dev/mac-
 bash ~/Repositories/dev/mac-workstation/scripts/mm_install.sh
 ```
 
+This run reports *"No git profile yet"* and continues. That is expected: the
+commit identity comes out of the vault in step 4, so it cannot exist yet. You
+run `mm install` once more in step 6 to turn it into the identity files. Until
+then git refuses to commit, which is the intended behaviour rather than a
+broken install.
+
 Note that this installs the whole `Brewfile` and pulls every model in `OLLAMA_MODELS` — tens of gigabytes and a long wait. If you only need your SSH keys back right now, skip ahead and call the script directly; it needs nothing beyond the `rsync` that ships with macOS:
 
 ```bash
