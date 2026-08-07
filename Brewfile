@@ -8,6 +8,7 @@ cask "docker-desktop"
 cask "github"
 cask "gitkraken"
 cask "intellij-idea"
+cask "jetbrains-toolbox"
 cask "postman"
 cask "visual-studio-code"
 
