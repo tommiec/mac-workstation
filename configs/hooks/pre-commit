@@ -1,0 +1,9 @@
+#!/bin/sh
+# Identity guard before a commit is created. Catches the everyday mistake — a
+# per-repository identity override — at the cheapest possible moment.
+#
+# The final author is only stamped after this hook runs, so the guarantee about
+# the author itself lives in pre-push.
+
+hook_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+exec "$hook_dir/git-profile-check" commit

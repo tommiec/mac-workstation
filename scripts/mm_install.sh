@@ -50,7 +50,7 @@ cat > "$MM_PATH" <<'EOF'
 MM_SCRIPTS_DIR="$HOME/Repositories/dev/mac-workstation/scripts"
 
 case "$1" in
-  auto|maintain|install|doctor|triage)
+  auto|maintain|install|doctor|triage|restore|selftest)
     MM_CMD="$1"
     shift
     exec "$MM_SCRIPTS_DIR/mm_${MM_CMD}.sh" "$@"
@@ -61,7 +61,9 @@ case "$1" in
     echo "  mm maintain  # run maintenance now (includes SSH/GPG backup prompts)"
     echo "  mm install   # run setup"
     echo "  mm doctor    # check setup health"
+    echo "  mm selftest  # verify the git identity hooks refuse what they should"
     echo "  mm triage    # quick file/malware triage"
+    echo "  mm restore   # restore SSH/GPG/git identity from the vault (dry run by default)"
     ;;
   *)
     echo "Unknown command: $1"

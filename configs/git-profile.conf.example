@@ -1,0 +1,27 @@
+# Example git profile. Copy to ~/.config/git/git-profile.conf and fill in.
+#
+# This file is the ONLY place that holds the commit identity and the forge
+# URLs. It is deliberately not stored in this repository: the addresses are
+# personal data and the self-hosted URLs describe an internal network. The
+# real file lives at ~/.config/git/git-profile.conf and is mirrored into the
+# encrypted vault by the SSH/GPG backup runs; 'mm restore --apply' brings it
+# back. This repository holds the mechanism, the vault holds the values.
+#
+# 'mm install' turns this into ~/.config/git/identity-<forge> files plus the
+# matching includeIf rules in ~/.gitconfig, so the identity follows the remote
+# instead of being set globally. See ~/Repositories/GIT.md.
+#
+# Format is git-config, parsed by git itself. One [forge "<name>"] section per
+# forge, with one url line per URL form you actually clone with. Add 'name' or
+# 'email' inside a forge section to override [user] for that forge only.
+
+[user]
+    name = your-handle
+    email = you@example.com
+
+[forge "github"]
+    url = https://github.com/**
+    url = git@github.com:**
+
+[forge "example-selfhosted"]
+    url = http://gitserver.example.internal:3000/**

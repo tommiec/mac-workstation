@@ -6,3 +6,8 @@
 
 # Runtime
 Library/Logs/mac_manager/
+
+# The real git profile holds the commit identity and internal forge URLs.
+# This repository is public: only the .example version belongs here.
+configs/git-profile.conf
+configs/git-identity-*

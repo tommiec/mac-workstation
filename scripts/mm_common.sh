@@ -26,6 +26,10 @@ CONFIGS_DIR="$REPO_ROOT/configs"
 BREWFILE="$REPO_ROOT/Brewfile"
 LOCAL_GIT_HOOKS_DIR="$HOME/.config/git/hooks"
 LOCAL_GIT_EXCLUDES="$HOME/.config/git/ignore.local"
+LOCAL_GIT_IDENTITY_PREFIX="$HOME/.config/git/identity"
+GIT_PROFILE_CONF="$HOME/.config/git/git-profile.conf"
+WORKSPACE_ROOT="$HOME/Repositories"
+WORKSPACE_SCOPES=(dev dossiers projects)
 BIN_DIR="$HOME/.local/bin"
 MM_PATH="$BIN_DIR/mm"
 
@@ -211,6 +215,126 @@ install_managed_git_config() {
     done < <(find "$hooks_src" -maxdepth 1 -type f -print)
 }
 
+# Installs the per-forge identity files and the conditional includes that pick
+# between them, from $GIT_PROFILE_CONF. Identity is deliberately never set
+# globally: user.useConfigOnly makes git fail loudly when a repo's remote
+# matches no rule, instead of committing under an address guessed from the
+# hostname. Policy: ~/Repositories/GIT.md
+#
+# The name, email and forge URLs are personal data and internal network
+# topology, so they live in that one machine-local file — kept in the encrypted
+# vault by backup_git_profile, never in this public repository. This repo holds
+# the mechanism; the vault holds the values.
+#
+# The file is in git-config format, so git itself parses it and no hand-written
+# parser is needed:
+#
+#   [user]                        <- default identity for every forge
+#       name  = ...
+#       email = ...
+#   [forge "github"]
+#       url   = https://github.com/**
+#       url   = git@github.com:**
+#       email = ...               <- optional, overrides [user] for this forge
+#
+# Every git config write below is single-valued, so re-running replaces rather
+# than appends, and nothing else in ~/.gitconfig is touched.
+
+git_profile_get() {
+    git config --file "$GIT_PROFILE_CONF" --get "$1" 2>/dev/null
+}
+
+# Prints the forge names declared in the profile, derived from the url keys.
+git_profile_forges() {
+    git config --file "$GIT_PROFILE_CONF" --name-only --get-regexp '^forge\..*\.url$' 2>/dev/null \
+        | sed -e 's/^forge\.//' -e 's/\.url$//' | sort -u
+}
+
+install_managed_git_identity() {
+    local forge name email url identity_file
+    local default_name default_email
+
+    if [[ ! -f "$GIT_PROFILE_CONF" ]]; then
+        echo "Git profile not found: $GIT_PROFILE_CONF" >&2
+        echo "Restore it with 'mm restore --apply', or create it from" >&2
+        echo "configs/git-profile.conf.example." >&2
+        return 1
+    fi
+
+    chmod 600 "$GIT_PROFILE_CONF" 2>/dev/null || true
+
+    default_name="$(git_profile_get user.name)"
+    default_email="$(git_profile_get user.email)"
+
+    while IFS= read -r forge; do
+        [[ -n "$forge" ]] || continue
+        name="$(git_profile_get "forge.$forge.name")"
+        email="$(git_profile_get "forge.$forge.email")"
+        name="${name:-$default_name}"
+        email="${email:-$default_email}"
+
+        if [[ -z "$name" || -z "$email" ]]; then
+            echo "Git profile has no identity for forge '$forge'" >&2
+            return 1
+        fi
+
+        identity_file="${LOCAL_GIT_IDENTITY_PREFIX}-$forge"
+        printf '[user]\n    name = %s\n    email = %s\n' "$name" "$email" \
+            > "$identity_file" || return 1
+        chmod 600 "$identity_file" || return 1
+
+        while IFS= read -r url; do
+            [[ -n "$url" ]] || continue
+            git config --global \
+                "includeIf.hasconfig:remote.*.url:${url}.path" \
+                "~/.config/git/identity-$forge" || return 1
+        done < <(git config --file "$GIT_PROFILE_CONF" --get-all "forge.$forge.url" 2>/dev/null)
+    done < <(git_profile_forges)
+
+    git config --global user.useConfigOnly true || return 1
+    git config --global credential.helper osxkeychain || return 1
+}
+
+# Mirrors the git profile into the vault, next to the SSH and GPG material.
+# Called from the backup scripts while the vault is already mounted; the
+# caller is responsible for mounting and ejecting.
+backup_git_profile() {
+    local dst="$VAULT_MOUNT_POINT/git-profile"
+
+    [[ -n "$VAULT_MOUNT_POINT" && -d "$VAULT_MOUNT_POINT" ]] || return 1
+    [[ -f "$GIT_PROFILE_CONF" ]] || return 1
+
+    mkdir -p "$dst" || return 1
+    cp "$GIT_PROFILE_CONF" "$dst/git-profile.conf" || return 1
+    chmod 600 "$dst/git-profile.conf" 2>/dev/null || true
+}
+
+# Prints one tab-separated "<repo-path> <identity-or-error> <config-origin>"
+# line per repository under the managed workspace scopes. The origin is included
+# so a caller can tell a compliant identity from one that merely resolves: a
+# per-repo override also produces a perfectly valid-looking identity.
+#
+# Deliberately without a depth limit: several repos are plain clones nested
+# inside another repo's working tree, which both -maxdepth and
+# 'git submodule foreach' would miss.
+git_workspace_identities() {
+    local scope repo git_dir
+    local -a roots=()
+
+    for scope in "${WORKSPACE_SCOPES[@]}"; do
+        [[ -d "$WORKSPACE_ROOT/$scope" ]] && roots+=("$WORKSPACE_ROOT/$scope")
+    done
+    [[ "${#roots[@]}" -gt 0 ]] || return 0
+
+    while IFS= read -r git_dir; do
+        repo="$(dirname "$git_dir")"
+        printf '%s\t%s\t%s\n' "${repo#"$WORKSPACE_ROOT"/}" \
+            "$(git -C "$repo" var GIT_AUTHOR_IDENT 2>&1 | head -n 1)" \
+            "$(git -C "$repo" config --show-origin --get user.email 2>/dev/null \
+                | sed -e 's/^file://' -e 's/	.*$//')"
+    done < <(find "${roots[@]}" -name .git -print 2>/dev/null | sort)
+}
+
 setup_git_global() {
     local git_config_dir="$HOME/.config/git"
     local src="$CONFIGS_DIR/git-ignore-global"
@@ -236,6 +360,8 @@ setup_git_global() {
 
     mkdir -p "$LOCAL_GIT_HOOKS_DIR" || return 1
     git config --global core.hooksPath "$LOCAL_GIT_HOOKS_DIR" || return 1
+
+    install_managed_git_identity || return 1
 }
 
 # ── Homebrew ────────────────────────────────────────────

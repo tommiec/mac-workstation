@@ -111,20 +111,89 @@ else
     check_fail "Global git hooks path not configured as expected"
 fi
 
-if [[ -x "$LOCAL_GIT_HOOKS_DIR/commit-msg" ]]; then
-    if cmp -s "$CONFIGS_DIR/hooks/commit-msg" "$LOCAL_GIT_HOOKS_DIR/commit-msg"; then
-        check_ok "Managed commit-msg hook installed and executable"
+while IFS= read -r HOOK_SRC; do
+    HOOK_NAME="$(basename "$HOOK_SRC")"
+    HOOK_DST="$LOCAL_GIT_HOOKS_DIR/$HOOK_NAME"
+    if [[ -x "$HOOK_DST" ]]; then
+        if cmp -s "$HOOK_SRC" "$HOOK_DST"; then
+            check_ok "Managed $HOOK_NAME hook installed and executable"
+        else
+            check_warn "Installed $HOOK_NAME hook differs from the repository version"
+        fi
     else
-        check_warn "Installed commit-msg hook differs from the repository version"
+        check_warn "Managed $HOOK_NAME hook missing or not executable"
     fi
-else
-    check_warn "Managed commit-msg hook missing or not executable"
-fi
+done < <(find "$CONFIGS_DIR/hooks" -maxdepth 1 -type f -print | sort)
 
 if cmp -s "$CONFIGS_DIR/ignore.local" "$LOCAL_GIT_EXCLUDES"; then
     check_ok "Managed local Git excludes installed"
 else
     check_warn "Installed local Git excludes differ from the repository version"
+fi
+
+# ── Git identity ────────────────────────────────────────
+# The profile is the only source of the commit identity and the forge URLs. It
+# is machine-local and vault-backed, never stored in this public repo, so the
+# checks below verify presence and effect rather than comparing against a
+# repository copy.
+
+if [[ -f "$GIT_PROFILE_CONF" ]]; then
+    check_ok "Git profile present: $GIT_PROFILE_CONF"
+
+    if [[ "$(git config --global --get user.useConfigOnly)" == "true" ]]; then
+        check_ok "user.useConfigOnly is on (git never guesses an identity)"
+    else
+        check_fail "user.useConfigOnly is not set — git may commit under a guessed address"
+    fi
+
+    GLOBAL_IDENT=""
+    for KEY in user.name user.email; do
+        if [[ -n "$(git config --global --get "$KEY")" ]]; then
+            GLOBAL_IDENT="$GLOBAL_IDENT $KEY"
+        fi
+    done
+    if [[ -n "$GLOBAL_IDENT" ]]; then
+        check_fail "Global identity set (${GLOBAL_IDENT# }); identity must come per forge"
+    else
+        check_ok "No global commit identity (correct: identity is per forge)"
+    fi
+
+    while IFS= read -r FORGE; do
+        [[ -n "$FORGE" ]] || continue
+        if [[ -f "${LOCAL_GIT_IDENTITY_PREFIX}-$FORGE" ]]; then
+            check_ok "Identity file installed for forge '$FORGE'"
+        else
+            check_fail "Identity file missing for forge '$FORGE' — run 'mm install'"
+        fi
+    done < <(git_profile_forges)
+else
+    check_fail "Git profile missing: $GIT_PROFILE_CONF"
+    echo "   Restore it with 'mm restore --git-profile --apply', then run 'mm install'"
+fi
+
+# Every repository in the managed workspace must resolve an identity, and it must
+# come from a managed identity file: a per-repo override resolves an identity too,
+# so checking only for a name and address would pass exactly the state the policy
+# forbids. Without a depth limit on purpose: several repos are plain clones nested
+# inside another repo's working tree.
+GIT_IDENT_TOTAL=0
+GIT_IDENT_BAD=0
+while IFS=$'\t' read -r REPO_PATH IDENT IDENT_FROM; do
+    [[ -n "$REPO_PATH" ]] || continue
+    GIT_IDENT_TOTAL=$((GIT_IDENT_TOTAL + 1))
+    if [[ "$IDENT" != *"<"*">"* ]]; then
+        GIT_IDENT_BAD=$((GIT_IDENT_BAD + 1))
+        check_fail "No identity in $REPO_PATH"
+    elif [[ "$IDENT_FROM" != "$LOCAL_GIT_IDENTITY_PREFIX"-* ]]; then
+        GIT_IDENT_BAD=$((GIT_IDENT_BAD + 1))
+        check_fail "$REPO_PATH overrides its identity in ${IDENT_FROM:-<unknown>}"
+    fi
+done < <(git_workspace_identities)
+
+if [[ "$GIT_IDENT_TOTAL" -eq 0 ]]; then
+    check_warn "No repositories found under $WORKSPACE_ROOT/{${WORKSPACE_SCOPES[*]// /,}}"
+elif [[ "$GIT_IDENT_BAD" -eq 0 ]]; then
+    check_ok "All $GIT_IDENT_TOTAL workspace repositories take their identity from a managed file"
 fi
 
 # ── Git repository ──────────────────────────────────────

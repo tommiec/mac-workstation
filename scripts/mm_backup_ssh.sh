@@ -71,9 +71,22 @@ EOF
 
 SSH_FILE_COUNT="$(find "$BACKUP_ROOT/.ssh" -type f 2>/dev/null | wc -l | tr -d ' ')"
 
+# The git profile rides along: it is small, it holds the commit identity and the
+# internal forge URLs, and it must not live in the public mac-workstation repo.
+# Both backup scripts do this so either run keeps it current.
+GIT_PROFILE_STATE="not found (nothing to back up)"
+if [[ -f "$GIT_PROFILE_CONF" ]]; then
+    if backup_git_profile; then
+        GIT_PROFILE_STATE="$VAULT_MOUNT_POINT/git-profile/git-profile.conf"
+    else
+        GIT_PROFILE_STATE="❌ backup failed"
+    fi
+fi
+
 echo
 echo "✅ SSH backup complete"
 echo "   Files: $SSH_FILE_COUNT"
+echo "   Git profile: $GIT_PROFILE_STATE"
 echo "   Backup: $BACKUP_ROOT/.ssh"
 echo "   PEM archive folder kept separate: $PEM_ARCHIVE"
 echo
