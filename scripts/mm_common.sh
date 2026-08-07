@@ -61,6 +61,7 @@ LOG_RETENTION_DAYS=60
 OLLAMA_LOG_MAX_BYTES=$((50 * 1024 * 1024))
 
 OLLAMA_MODELS=(
+  qwen3.6:27b
   devstral:24b
   qwen3-coder:30b
   gemma3:27b
