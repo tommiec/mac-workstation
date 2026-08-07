@@ -10,6 +10,7 @@ cask "gitkraken"
 cask "jetbrains-toolbox"
 cask "postman"
 cask "visual-studio-code"
+cask "zed"
 
 # ── Casks: AI / media ───────────────────────────────────
 cask "chatgpt"
