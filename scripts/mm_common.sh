@@ -224,8 +224,8 @@ install_managed_git_config() {
 #
 # The name, email and forge URLs are personal data and internal network
 # topology, so they live in that one machine-local file — kept in the encrypted
-# vault by backup_git_profile, never in this public repository. This repo holds
-# the mechanism; the vault holds the values.
+# vault by mm_backup_git_profile.sh, never in this public repository. This repo
+# holds the mechanism; the vault holds the values.
 #
 # The file is in git-config format, so git itself parses it and no hand-written
 # parser is needed:
@@ -299,7 +299,7 @@ install_managed_git_identity() {
 }
 
 # Mirrors the git profile into the vault, next to the SSH and GPG material.
-# Called from the backup scripts while the vault is already mounted; the
+# Called by mm_backup_git_profile.sh while the vault is already mounted; the
 # caller is responsible for mounting and ejecting.
 backup_git_profile() {
     local dst="$VAULT_MOUNT_POINT/git-profile"
