@@ -420,7 +420,11 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "   Dry run only. Re-run with --apply to perform the restore."
 else
     echo "   Verify with:"
-    [[ "$DO_SSH" -eq 1 ]] && echo "     ssh -T git@github.com"
+    # Deliberately not 'ssh -T git@github.com': the git remotes here are HTTPS,
+    # so that would test an authentication path this machine does not use and
+    # fail for the wrong reason. Check the agent instead, and test whichever
+    # endpoint the restored key is actually for.
+    [[ "$DO_SSH" -eq 1 ]] && echo "     ssh-add -l    # then test your own SSH endpoints"
     [[ "$DO_GPG" -eq 1 ]] && echo "     gpg --list-secret-keys --keyid-format LONG"
     echo "     mm doctor"
 fi
