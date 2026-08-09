@@ -1,7 +1,7 @@
 #!/bin/bash
 # =========================================================
 # mm_maintain.sh
-# Run maintenance now: Homebrew, DNS flush, macOS updates, optional SSH backup
+# Run maintenance now: Homebrew, DNS flush, macOS updates, optional secrets backup
 #
 # Usage (after installation):
 #   mm maintain
@@ -13,8 +13,7 @@
 #   - Optionally upgrades outdated Homebrew casks
 #   - Flushes the DNS cache
 #   - Detects and optionally installs macOS updates
-#   - Optionally backs up ~/.ssh to the encrypted iCloud vault
-#   - Optionally backs up GPG keys/trust to the encrypted iCloud vault
+#   - Optionally backs up SSH, GPG and the git profile in one vault session
 #   - Optionally clears QuickTime recent documents history
 #
 # Some steps request sudo only when needed.
@@ -169,56 +168,21 @@ else
     fi
 fi
 
-# ── SSH backup ───────────────────────
+# ── Secrets backup ────────────────────
+# mm backup keeps the three independent backup formats, but mounts the vault
+# only once. A failure in one section never prevents the others from running.
 echo
-echo "── 🔐 SSH backup ─────────────────────────────────"
+echo "── 🔐 Secrets backup ─────────────────────────────"
 
-read -r -p "   Backup ~/.ssh to encrypted iCloud vault? (y/N): " confirm_backup
+read -r -p "   Back up SSH, GPG and git profile to the encrypted vault? (y/N): " confirm_backup
 if [[ "$confirm_backup" =~ ^[Yy]$ ]]; then
-    if bash "$SCRIPT_DIR/mm_backup_ssh.sh"; then
-        log_ok "SSH backup completed"
+    if bash "$SCRIPT_DIR/mm_backup.sh"; then
+        log_ok "Secrets backup completed"
     else
-        log_warn "SSH backup failed"
+        log_warn "Secrets backup incomplete"
     fi
 else
-    log_info "SSH backup skipped"
-fi
-
-# ── GPG backup ───────────────────────
-echo
-echo "── 🔏 GPG backup ─────────────────────────────────"
-
-read -r -p "   Backup GPG keys and trust to encrypted iCloud vault? (y/N): " confirm_gpg_backup
-if [[ "$confirm_gpg_backup" =~ ^[Yy]$ ]]; then
-    if bash "$SCRIPT_DIR/mm_backup_gpg.sh"; then
-        log_ok "GPG backup completed"
-    else
-        log_warn "GPG backup failed"
-    fi
-else
-    log_info "GPG backup skipped"
-fi
-
-# ── Git profile backup ───────────────────
-# Its own step, not part of the SSH or GPG runs: those abort when ~/.ssh or a
-# keyring is missing, which would leave the commit identity out of the vault on
-# a machine that has neither.
-echo
-echo "── 🪪  Git profile backup ────────────────────────"
-
-if [[ ! -f "$GIT_PROFILE_CONF" ]]; then
-    log_info "No git profile on this machine; nothing to back up"
-else
-    read -r -p "   Backup the git commit identity to encrypted iCloud vault? (y/N): " confirm_git_profile
-    if [[ "$confirm_git_profile" =~ ^[Yy]$ ]]; then
-        if bash "$SCRIPT_DIR/mm_backup_git.sh"; then
-            log_ok "Git profile backup completed"
-        else
-            log_warn "Git profile backup failed"
-        fi
-    else
-        log_info "Git profile backup skipped"
-    fi
+    log_info "Secrets backup skipped"
 fi
 
 clear_quicktime_history() {

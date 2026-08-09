@@ -18,12 +18,13 @@ One-time setup. Runs automatically. Manual control when needed.
 |---|---|
 | `mm_install.sh` | Bootstrap setup (repo, CLI, launchd) |
 | `mm_auto.sh` | Automated weekly maintenance (launchd) |
-| `mm_maintain.sh` | Run maintenance now: Homebrew, optional cask upgrades, DNS flush, macOS updates, optional SSH backup, optional QuickTime history cleanup |
+| `mm_maintain.sh` | Run maintenance now: Homebrew, optional cask upgrades, DNS flush, macOS updates, optional secrets backup, optional QuickTime history cleanup |
 | `mm_doctor.sh` | Health checks and diagnostics (`mm doctor`) |
 | `mm_triage.sh` | Quick file/malware triage with hash, VirusTotal and strings (`mm triage`) |
-| `mm_backup_ssh.sh` | Backup `~/.ssh` to an encrypted iCloud sparsebundle (called by `mm maintain`) |
+| `mm_backup.sh` | Back up SSH, GPG and the git profile in one encrypted-vault session (`mm backup`; called by `mm maintain`) |
+| `mm_backup_ssh.sh` | Backup `~/.ssh` to an encrypted iCloud sparsebundle |
 | `mm_backup_gpg.sh` | Backup GPG keys, ownertrust and `~/.gnupg` to the encrypted iCloud sparsebundle |
-| `mm_backup_git.sh` | Backup the git commit identity to the encrypted iCloud sparsebundle (called by `mm maintain`) |
+| `mm_backup_git.sh` | Backup the git commit identity to the encrypted iCloud sparsebundle |
 | `mm_restore.sh` | Restore SSH material, GPG material and the git identity from the vault onto a new Mac (`mm restore`, dry run by default) |
 | `mm_selftest.sh` | Assert that the git identity hooks refuse what the policy forbids (`mm selftest`) |
 | `mm_common.sh` | Shared configuration and helpers |
@@ -192,7 +193,8 @@ That file is the only place holding the name, the address and the forge URLs. It
 is **not** stored in this repository: this repo is public, and those values are
 personal data and internal network topology. `configs/git-profile.conf.example`
 documents the format; the real file is mirrored into the encrypted vault by the
-git profile backup step in `mm maintain` and restored by `mm restore`.
+git profile backup step in `mm backup` (also called by `mm maintain`) and
+restored by `mm restore`.
 
 The managed `pre-commit` and `pre-push` hooks reject a per-repository identity
 override, an unknown remote, and outgoing commits with the wrong author. Full
@@ -207,6 +209,7 @@ policy, recovery procedure and threat model: `~/Repositories/GIT.md`.
 ```bash
 mm auto      # run automated maintenance now
 mm maintain  # run maintenance now (interactive prompts)
+mm backup    # back up SSH, GPG and git profile (one vault password prompt)
 mm install   # re-run setup
 mm doctor    # check system health
 mm selftest  # verify the git identity hooks refuse what they should
@@ -219,7 +222,7 @@ configured, selftest asserts in a throwaway sandbox that the managed git hooks
 actually reject a per-repo identity override, an unknown remote and an outgoing
 commit with the wrong author. Doctor alone only ever exercises the happy path.
 
-`mm maintain` reports drift so keeping, uninstalling, or adopting into the `Brewfile` stays a deliberate choice: Homebrew packages installed outside the `Brewfile`, and apps in `/Applications` that did not come in through Homebrew (labelled App Store or manual install). It then asks before taking optional actions: upgrading outdated Homebrew casks, installing macOS updates, backing up `~/.ssh`, GPG keys/trust and the git commit identity to the encrypted iCloud vault, and clearing QuickTime Player's recent documents history. The QuickTime cleanup removes QuickTime's app-specific recent-document shared-file-list entries and legacy QuickTime preference keys. It does not delete media files and does not clear system-wide macOS Recent Items.
+`mm maintain` reports drift so keeping, uninstalling, or adopting into the `Brewfile` stays a deliberate choice: Homebrew packages installed outside the `Brewfile`, and apps in `/Applications` that did not come in through Homebrew (labelled App Store or manual install). It then asks before taking optional actions: upgrading outdated Homebrew casks, installing macOS updates, running `mm backup` (SSH, GPG keys/trust and git identity in one vault mount), and clearing QuickTime Player's recent documents history. The QuickTime cleanup removes QuickTime's app-specific recent-document shared-file-list entries and legacy QuickTime preference keys. It does not delete media files and does not clear system-wide macOS Recent Items.
 
 ## File triage
 
@@ -284,9 +287,9 @@ gpg-backup/
 pem-archive/
 ```
 
-`ssh-backup/` is managed by the optional SSH backup prompt in `mm maintain`. It mirrors `~/.ssh` into the encrypted vault and may overwrite that backup on future runs.
+`ssh-backup/` is managed by `mm backup` (and its prompt in `mm maintain`). It mirrors `~/.ssh` into the encrypted vault and may overwrite that backup on future runs.
 
-`gpg-backup/` is managed by the optional GPG backup prompt in `mm maintain`. It stores `latest/portable/` exports (`public-keys.asc`, `secret-keys.asc`, `ownertrust.txt`, and `secret-keys-list.txt`), `latest/full-gnupg/.gnupg/`, and timestamped archives under `archives/`.
+`gpg-backup/` is managed by `mm backup` (and its prompt in `mm maintain`). It stores `latest/portable/` exports (`public-keys.asc`, `secret-keys.asc`, `ownertrust.txt`, and `secret-keys-list.txt`), `latest/full-gnupg/.gnupg/`, and timestamped archives under `archives/`.
 
 Both backups are restored with `mm restore`; see [Restore on a new Mac](#restore-on-a-new-mac). The equivalent manual GPG import, if you prefer to do it by hand:
 
