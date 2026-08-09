@@ -350,11 +350,18 @@ The GPG half behaves differently, and deliberately so. The default imports the p
 
 Use `--ssh` or `--gpg` to restore one half only.
 
-**5. Load the SSH key into the agent and Keychain**, so the passphrase is asked once rather than every connection:
+**5. Optional — load an SSH key into the agent and Keychain**, so its passphrase
+is asked once rather than every connection. Only worth doing for a key you use
+interactively; a key an automated job reads straight from disk needs nothing
+here.
 
 ```bash
-ssh-add --apple-use-keychain ~/.ssh/id_ed25519
+ssh-add --apple-use-keychain ~/.ssh/<key-for-that-endpoint>
 ```
+
+There is no default key name to fill in: keys here are named after the endpoint
+they belong to, one per purpose, so substitute the actual filename. `ls ~/.ssh`
+shows what came back.
 
 **6. Regenerate the git identity.** `mm restore` brought back
 `~/.config/git/git-profile.conf` from the vault, but the files git actually
@@ -384,18 +391,28 @@ git config --global commit.gpgsign true
 
 ```bash
 git -C ~/Repositories/dev/mac-workstation fetch
+git -C ~/Repositories/dev/mac-workstation var GIT_AUTHOR_IDENT
 gpg --list-secret-keys --keyid-format LONG
-ssh-add -l
 mm doctor
 mm selftest
 ```
 
-The git remotes here are HTTPS, so a `fetch` is the meaningful git test: it
-exercises the identity, the credential helper and network access in one go.
-`ssh -T git@github.com` is **not** part of this list — it tests an
-authentication path this setup does not use, and would fail for a reason that
-has nothing to do with the restore. Run it only if you have deliberately moved
-GitHub remotes to SSH and registered a GitHub-specific key.
+Those first two check different halves and neither substitutes for the other.
+The `fetch` proves **access**: the credential helper and the network. It never
+writes a commit, so it says nothing about who you would commit as. `git var
+GIT_AUTHOR_IDENT` proves the **identity**, and must print a name and address
+rather than an error. `mm doctor` then does both across every repository at
+once, which is why it is the real verification and these two are just the quick
+manual spot check.
+
+`ssh -T git@github.com` is **not** in this list — it tests an authentication
+path this setup does not use, and would fail for a reason that has nothing to do
+with the restore. Run it only if you have deliberately moved GitHub remotes to
+SSH and registered a GitHub-specific key.
+
+`ssh-add -l` is an optional agent check, not a pass/fail one: with no key loaded
+it prints "The agent has no identities" and exits 1, which is normal and does
+not mean the restore failed.
 
 SSH keys here are for their own endpoints, not for git. Keep one key per
 purpose, named after that purpose, and give each its own `Host` block in
