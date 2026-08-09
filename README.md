@@ -356,12 +356,18 @@ interactively; a key an automated job reads straight from disk needs nothing
 here.
 
 ```bash
-ssh-add --apple-use-keychain ~/.ssh/<key-for-that-endpoint>
+ssh-add ~/.ssh/<key-for-that-endpoint>
 ```
 
 There is no default key name to fill in: keys here are named after the endpoint
 they belong to, one per purpose, so substitute the actual filename. `ls ~/.ssh`
 shows what came back.
+
+That loads the key for this login session only. Adding `--apple-use-keychain`
+writes the passphrase into the login Keychain permanently, so the key unlocks
+without ever asking again. That is a deliberate trade — convenience against a
+passphrase that now lives on disk — so it stays opt-in rather than the default
+here.
 
 **6. Regenerate the git identity.** `mm restore` brought back
 `~/.config/git/git-profile.conf` from the vault, but the files git actually
