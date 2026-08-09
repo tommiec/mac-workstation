@@ -383,10 +383,25 @@ git config --global commit.gpgsign true
 **7. Verify.**
 
 ```bash
-ssh -T git@github.com
+git -C ~/Repositories/dev/mac-workstation fetch
 gpg --list-secret-keys --keyid-format LONG
+ssh-add -l
 mm doctor
+mm selftest
 ```
+
+The git remotes here are HTTPS, so a `fetch` is the meaningful git test: it
+exercises the identity, the credential helper and network access in one go.
+`ssh -T git@github.com` is **not** part of this list — it tests an
+authentication path this setup does not use, and would fail for a reason that
+has nothing to do with the restore. Run it only if you have deliberately moved
+GitHub remotes to SSH and registered a GitHub-specific key.
+
+SSH keys here are for their own endpoints, not for git. Keep one key per
+purpose, named after that purpose, and give each its own `Host` block in
+`~/.ssh/config` with `IdentitiesOnly yes` — never a `Host *` entry, which would
+offer the wrong key to every server you touch. `~/.ssh/config` is picked up by
+the SSH backup automatically; the real hostnames stay out of this repository.
 
 `mm doctor` warns about a missing `~/.ssh`, so a clean run there confirms the SSH half.
 

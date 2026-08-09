@@ -55,6 +55,7 @@ if rsync -a --delete \
     --exclude 'agent/' \
     --exclude '*.sock' \
     --exclude 'control-*' \
+    --exclude '.DS_Store' \
     "$SSH_SOURCE/" "$BACKUP_ROOT/.ssh/"; then
     chmod 700 "$BACKUP_ROOT/.ssh" 2>/dev/null || true
 else
@@ -66,7 +67,7 @@ cat > "$BACKUP_ROOT/manifest.txt" <<EOF
 source=$SSH_SOURCE
 created_at=$(date '+%Y-%m-%d %H:%M:%S %z')
 vault=$VAULT_PATH
-excluded=agent/, *.sock, control-*
+excluded=agent/, *.sock, control-*, .DS_Store
 EOF
 
 SSH_FILE_COUNT="$(find "$BACKUP_ROOT/.ssh" -type f 2>/dev/null | wc -l | tr -d ' ')"
