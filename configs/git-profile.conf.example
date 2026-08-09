@@ -4,7 +4,8 @@
 # URLs. It is deliberately not stored in this repository: the addresses are
 # personal data and the self-hosted URLs describe an internal network. The
 # real file lives at ~/.config/git/git-profile.conf and is mirrored into the
-# encrypted vault by 'mm maintain'; 'mm restore --git-profile --apply' brings it
+# encrypted vault by 'mm backup' (also run by 'mm maintain'); 'mm restore
+# --git-profile --apply' brings it
 # back. This repository holds the mechanism, the vault holds the values.
 #
 # 'mm install' turns this into ~/.config/git/identity-<forge> files plus the

@@ -18,6 +18,7 @@
 # After installation:
 #   mm auto
 #   mm maintain
+#   mm backup
 #   mm install
 #   mm doctor
 # =========================================================
@@ -50,7 +51,7 @@ cat > "$MM_PATH" <<'EOF'
 MM_SCRIPTS_DIR="$HOME/Repositories/dev/mac-workstation/scripts"
 
 case "$1" in
-  auto|maintain|install|doctor|triage|restore|selftest)
+  auto|maintain|backup|install|doctor|triage|restore|selftest)
     MM_CMD="$1"
     shift
     exec "$MM_SCRIPTS_DIR/mm_${MM_CMD}.sh" "$@"
@@ -58,7 +59,8 @@ case "$1" in
   help|"")
     echo "Usage:"
     echo "  mm auto      # automated maintenance"
-    echo "  mm maintain  # run maintenance now (includes SSH/GPG backup prompts)"
+    echo "  mm maintain  # run maintenance now (includes one secrets-backup prompt)"
+    echo "  mm backup    # back up SSH, GPG and git profile in one vault session"
     echo "  mm install   # run setup"
     echo "  mm doctor    # check setup health"
     echo "  mm selftest  # verify the git identity hooks refuse what they should"

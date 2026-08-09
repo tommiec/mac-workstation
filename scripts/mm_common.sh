@@ -484,6 +484,15 @@ ensure_vault() {
 vault_mount() {
     local attach_out=""
 
+    # An orchestrator such as mm_backup.sh can mount the vault once and pass
+    # the actual mount path to child backup scripts. This also works when
+    # macOS had to append " 1" to the volume name because of a name clash.
+    if [[ -n "${MM_VAULT_MOUNT_POINT:-}" && -d "$MM_VAULT_MOUNT_POINT" ]]; then
+        VAULT_MOUNT_POINT="$MM_VAULT_MOUNT_POINT"
+        echo "Using vault mounted by parent: $VAULT_MOUNT_POINT"
+        return 0
+    fi
+
     if [[ -d "/Volumes/$VAULT_NAME" ]]; then
         VAULT_MOUNT_POINT="/Volumes/$VAULT_NAME"
         echo "Using already mounted vault: $VAULT_MOUNT_POINT"
