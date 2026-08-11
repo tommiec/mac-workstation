@@ -415,7 +415,7 @@ fi
 
 # Signing keys are not part of the profile: signing is opt-in per machine.
 # Query it as a boolean: a literal "false" must not be treated as enabled.
-if [[ "$(git config --global --type=bool --get commit.gpgsign 2>/dev/null)" == "true" ]] \
+if git_commit_signing_enabled \
     && [[ -z "$(git config --global --get user.signingkey)" ]]; then
     log_warn "commit.gpgsign is on but user.signingkey is unset; commits will fail"
 fi

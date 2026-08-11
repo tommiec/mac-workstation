@@ -102,6 +102,12 @@ log_info() {
     echo "   ℹ️  $*"
 }
 
+# Git stores boolean configuration as text. Query through --type=bool so an
+# explicit "false" is never mistaken for an enabled setting.
+git_commit_signing_enabled() {
+    [[ "$(git config --global --type=bool --get commit.gpgsign 2>/dev/null)" == "true" ]]
+}
+
 record_script_result() {
     local script_name="$1"
     local exit_code="$2"

@@ -1,7 +1,8 @@
 #!/bin/bash
 # =========================================================
 # mm_selftest.sh
-# Negative tests for the managed git identity hooks.
+# Negative tests for the managed git identity hooks and core backup/restore
+# safeguards.
 #
 # 'mm doctor' checks that this machine is configured correctly. This checks the
 # opposite: that the hooks actually REFUSE the states the policy forbids. A
@@ -20,6 +21,9 @@ set -u
 
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPTS_DIR/mm_common.sh"
+# mm_backup.sh only runs main when executed directly, so sourcing it gives this
+# test access to its option parser without mounting the vault.
+source "$SCRIPTS_DIR/mm_backup.sh"
 trap 'record_script_result "mm_selftest.sh" "$?"' EXIT
 
 PASS_COUNT=0
@@ -59,6 +63,78 @@ first_url_for_forge() {
 identity_for_forge() {
     git config --file "${LOCAL_GIT_IDENTITY_PREFIX}-$1" --get "user.$2" 2>/dev/null
 }
+
+expect_logic() {
+    local want="$1" desc="$2" got=1
+    shift 2
+
+    if "$@"; then
+        got=0
+    else
+        got=1
+    fi
+
+    if [[ "$got" -eq "$want" ]]; then
+        printf '✅ %-46s (logic exit %s)\n' "$desc" "$got"
+        PASS_COUNT=$((PASS_COUNT + 1))
+    else
+        printf '❌ %-46s expected exit %s, got %s\n' "$desc" "$want" "$got"
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+    fi
+}
+
+expect_backup_selection() {
+    local expected="$1"
+    shift
+    parse_backup_options "$@"
+    [[ "$DO_SSH,$DO_GPG,$DO_GIT_PROFILE" == "$expected" ]]
+}
+
+expect_backup_rejects_unknown_option() {
+    parse_backup_options --bogus >/dev/null 2>&1
+}
+
+expect_gpgsign_state() {
+    local value="$1"
+    local config="$WORK_DIR/gpgsign-$value.conf"
+
+    if [[ "$value" != "unset" ]]; then
+        git config --file "$config" commit.gpgsign "$value"
+    else
+        : > "$config"
+    fi
+
+    GIT_CONFIG_GLOBAL="$config" git_commit_signing_enabled
+}
+
+expect_vault_handoff() {
+    local mount="$WORK_DIR/mounted-vault"
+    local previous_mount="$VAULT_MOUNT_POINT"
+    local previous_mounted_by_script="$VAULT_MOUNTED_BY_SCRIPT"
+    local result=1
+
+    mkdir -p "$mount"
+    MM_VAULT_MOUNT_POINT="$mount" vault_mount >/dev/null \
+        && [[ "$VAULT_MOUNT_POINT" == "$mount" ]] \
+        && [[ "$VAULT_MOUNTED_BY_SCRIPT" -eq 0 ]] && result=0
+
+    VAULT_MOUNT_POINT="$previous_mount"
+    VAULT_MOUNTED_BY_SCRIPT="$previous_mounted_by_script"
+    return "$result"
+}
+
+# ── Core backup/restore safeguards ──────────────────────
+
+echo "── core backup/restore safeguards ──"
+expect_logic 0 "gpgsign=true is enabled" expect_gpgsign_state true
+expect_logic 1 "gpgsign=false is disabled" expect_gpgsign_state false
+expect_logic 1 "unset gpgsign is disabled" expect_gpgsign_state unset
+expect_logic 0 "backup: no flags selects all sections" expect_backup_selection "1,1,1"
+expect_logic 0 "backup: --ssh selects SSH only" expect_backup_selection "1,0,0" --ssh
+expect_logic 0 "backup: GPG and git flags compose" expect_backup_selection "0,1,1" --gpg --git-profile
+expect_logic 1 "backup: unknown option is rejected" expect_backup_rejects_unknown_option
+expect_logic 0 "backup: child reuses parent vault mount" expect_vault_handoff
+echo
 
 # Creates a repo with the given remote and one commit. Hooks are skipped and the
 # identity is passed in the environment, so setup never depends on the very
@@ -208,5 +284,5 @@ if [[ "$FAIL_COUNT" -gt 0 ]]; then
     exit 1
 fi
 
-echo "   ✅ The identity guard refuses every forbidden state."
+echo "   ✅ The identity guard and core safeguards passed."
 echo

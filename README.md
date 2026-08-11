@@ -26,7 +26,7 @@ One-time setup. Runs automatically. Manual control when needed.
 | `mm_backup_gpg.sh` | Backup GPG keys, ownertrust and `~/.gnupg` to the encrypted iCloud sparsebundle |
 | `mm_backup_git.sh` | Backup the git commit identity to the encrypted iCloud sparsebundle |
 | `mm_restore.sh` | Restore SSH material, GPG material and the git identity from the vault onto a new Mac (`mm restore`, dry run by default) |
-| `mm_selftest.sh` | Assert that the git identity hooks refuse what the policy forbids (`mm selftest`) |
+| `mm_selftest.sh` | Assert git identity hooks and core backup/restore safeguards (`mm selftest`) |
 | `mm_common.sh` | Shared configuration and helpers |
 
 The managed apps and CLI tools are declared in the repo-root `Brewfile` and installed with `brew bundle`.
@@ -212,15 +212,15 @@ mm maintain  # run maintenance now (interactive prompts)
 mm backup    # back up SSH, GPG and git profile (one vault password prompt)
 mm install   # re-run setup
 mm doctor    # check system health
-mm selftest  # verify the git identity hooks refuse what they should
+mm selftest  # verify git hooks plus backup/restore safeguards
 mm triage <file>  # inspect a suspicious file
 mm help      # show available commands
 ```
 
 `mm doctor` and `mm selftest` are complements: doctor audits how this machine is
-configured, selftest asserts in a throwaway sandbox that the managed git hooks
-actually reject a per-repo identity override, an unknown remote and an outgoing
-commit with the wrong author. Doctor alone only ever exercises the happy path.
+configured, while selftest uses a throwaway sandbox to assert that the managed
+git hooks reject forbidden identity states and that core backup/restore
+safeguards behave as intended. Doctor alone only ever exercises the happy path.
 
 `mm maintain` reports drift so keeping, uninstalling, or adopting into the `Brewfile` stays a deliberate choice: Homebrew packages installed outside the `Brewfile`, and apps in `/Applications` that did not come in through Homebrew (labelled App Store or manual install). It then asks before taking optional actions: upgrading outdated Homebrew casks, opening macOS Software Update in System Settings, running `mm backup` (SSH, GPG keys/trust and git identity in one vault mount), and clearing QuickTime Player's recent documents history. Authentication for macOS updates is never collected in the terminal: System Settings handles it through its protected UI. The QuickTime cleanup removes QuickTime's app-specific recent-document shared-file-list entries and legacy QuickTime preference keys. It does not delete media files and does not clear system-wide macOS Recent Items.
 
