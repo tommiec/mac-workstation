@@ -37,6 +37,7 @@ cask "burp-suite"
 cask "cyberduck"
 cask "gpg-suite"
 cask "malwarebytes"
+cask "raspberry-pi-imager"
 cask "wireshark-app"
 
 # ── Casks: System utilities ─────────────────────────────

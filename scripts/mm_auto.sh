@@ -118,7 +118,7 @@ if command -v ollama >/dev/null 2>&1 \
 fi
 
 # ── macOS updates ────────────────────
-# Detect and report only; installation happens through 'mm maintain'.
+# Detect and report only; mm maintain opens Software Update in System Settings.
 # softwareupdate --list writes to stderr; 2>&1 captures it.
 
 echo
@@ -131,7 +131,7 @@ if [[ "$COUNT" -eq 0 ]]; then
     log_ok "No macOS updates available"
 else
     log_warn "$COUNT macOS update(s) available"
-    notify_user "macOS updates available" "Use 'mm maintain' to install them."
+    notify_user "macOS updates available" "Use 'mm maintain' to open Software Update."
 fi
 
 # ── Cache cleanup ────────────────────
