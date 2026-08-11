@@ -37,46 +37,34 @@ Usage: mm backup [--ssh] [--gpg] [--git-profile]
 EOF
 }
 
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --ssh) DO_SSH=1 ;;
-        --gpg) DO_GPG=1 ;;
-        --git-profile) DO_GIT_PROFILE=1 ;;
-        -h|--help) usage; exit 0 ;;
-        *) echo "Unknown option: $1"; echo; usage; exit 1 ;;
-    esac
-    shift
-done
+parse_backup_options() {
+    DO_SSH=0
+    DO_GPG=0
+    DO_GIT_PROFILE=0
 
-if [[ "$DO_SSH" -eq 0 && "$DO_GPG" -eq 0 && "$DO_GIT_PROFILE" -eq 0 ]]; then
-    DO_SSH=1
-    DO_GPG=1
-    DO_GIT_PROFILE=1
-fi
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --ssh) DO_SSH=1 ;;
+            --gpg) DO_GPG=1 ;;
+            --git-profile) DO_GIT_PROFILE=1 ;;
+            -h|--help) usage; return 2 ;;
+            *) echo "Unknown option: $1"; echo; usage; return 1 ;;
+        esac
+        shift
+    done
+
+    if [[ "$DO_SSH" -eq 0 && "$DO_GPG" -eq 0 && "$DO_GIT_PROFILE" -eq 0 ]]; then
+        DO_SSH=1
+        DO_GPG=1
+        DO_GIT_PROFILE=1
+    fi
+}
 
 cleanup() {
     local status="$1"
     vault_eject
     record_script_result "mm_backup.sh" "$status"
 }
-trap 'status=$?; cleanup "$status"' EXIT
-
-echo "── 🔐 Secrets backup ──"
-echo
-echo "Vault: $VAULT_PATH"
-echo "The vault is mounted once for all selected backup sections."
-echo
-
-if ! ensure_vault; then
-    echo "❌ Could not create encrypted sparsebundle"
-    exit 1
-fi
-
-if ! vault_mount; then
-    echo "❌ Could not mount encrypted sparsebundle"
-    exit 1
-fi
-
 run_backup() {
     local label="$1"
     local script="$2"
@@ -89,22 +77,59 @@ run_backup() {
     fi
 }
 
-[[ "$DO_SSH" -eq 1 ]] && run_backup "SSH" "mm_backup_ssh.sh"
-[[ "$DO_GPG" -eq 1 ]] && run_backup "GPG" "mm_backup_gpg.sh"
-[[ "$DO_GIT_PROFILE" -eq 1 ]] && run_backup "Git profile" "mm_backup_git.sh"
+main() {
+    local parse_status
 
-echo
-echo "── 📊 Backup summary ─────────────────────────────"
-if [[ "$BACKUP_FAILED" -eq 0 ]]; then
-    echo "✅ All selected backups completed"
-else
-    echo "❌ One or more selected backups failed; see the warnings above."
+    parse_backup_options "$@"
+    parse_status=$?
+    if [[ "$parse_status" -eq 2 ]]; then
+        exit 0
+    elif [[ "$parse_status" -ne 0 ]]; then
+        exit "$parse_status"
+    fi
+
+    BACKUP_FAILED=0
+    trap 'status=$?; cleanup "$status"' EXIT
+
+    echo "── 🔐 Secrets backup ──"
+    echo
+    echo "Vault: $VAULT_PATH"
+    echo "The vault is mounted once for all selected backup sections."
+    echo
+
+    if ! ensure_vault; then
+        echo "❌ Could not create encrypted sparsebundle"
+        exit 1
+    fi
+
+    if ! vault_mount; then
+        echo "❌ Could not mount encrypted sparsebundle"
+        exit 1
+    fi
+
+    [[ "$DO_SSH" -eq 1 ]] && run_backup "SSH" "mm_backup_ssh.sh"
+    [[ "$DO_GPG" -eq 1 ]] && run_backup "GPG" "mm_backup_gpg.sh"
+    [[ "$DO_GIT_PROFILE" -eq 1 ]] && run_backup "Git profile" "mm_backup_git.sh"
+
+    echo
+    echo "── 📊 Backup summary ─────────────────────────────"
+    if [[ "$BACKUP_FAILED" -eq 0 ]]; then
+        echo "✅ All selected backups completed"
+    else
+        echo "❌ One or more selected backups failed; see the warnings above."
+    fi
+
+    if [[ "$VAULT_MOUNTED_BY_SCRIPT" -eq 1 ]]; then
+        echo "   The vault will now be unmounted. Wait for iCloud Drive to finish syncing it."
+    else
+        echo "   The vault was already mounted, so it will stay open."
+    fi
+
+    exit "$BACKUP_FAILED"
+}
+
+# Allow the option parser to be sourced by mm_selftest.sh without touching the
+# vault. Executing this file directly still runs the full backup command.
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
 fi
-
-if [[ "$VAULT_MOUNTED_BY_SCRIPT" -eq 1 ]]; then
-    echo "   The vault will now be unmounted. Wait for iCloud Drive to finish syncing it."
-else
-    echo "   The vault was already mounted, so it will stay open."
-fi
-
-exit "$BACKUP_FAILED"

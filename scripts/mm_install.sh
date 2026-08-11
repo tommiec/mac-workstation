@@ -63,7 +63,7 @@ case "$1" in
     echo "  mm backup    # back up SSH, GPG and git profile in one vault session"
     echo "  mm install   # run setup"
     echo "  mm doctor    # check setup health"
-    echo "  mm selftest  # verify the git identity hooks refuse what they should"
+    echo "  mm selftest  # verify git hooks plus backup/restore safeguards"
     echo "  mm triage    # quick file/malware triage"
     echo "  mm restore   # restore SSH/GPG/git identity from the vault (dry run by default)"
     ;;
