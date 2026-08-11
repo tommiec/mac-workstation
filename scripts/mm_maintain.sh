@@ -12,7 +12,7 @@
 #   - Runs brew doctor
 #   - Optionally upgrades outdated Homebrew casks
 #   - Flushes the DNS cache
-#   - Detects and optionally installs macOS updates
+#   - Detects macOS updates and can open Software Update in System Settings
 #   - Optionally backs up SSH, GPG and the git profile in one vault session
 #   - Optionally clears QuickTime recent documents history
 #
@@ -149,22 +149,20 @@ else
     log_warn "$COUNT macOS update(s) available"
     echo "$UPDATES" | awk '/^[[:space:]]*\*/ { sub(/^[[:space:]]*\*[[:space:]]*/, ""); print "      - " $0 }'
 
-    read -r -p "   Install updates? (y/N): " confirm
+    # softwareupdate can show its own password prompt for major and beta
+    # upgrades. That prompt is not guaranteed to disable terminal echo, so
+    # never collect a macOS password through this script. System Settings uses
+    # macOS's protected authentication UI instead.
+    read -r -p "   Open Software Update in System Settings now? (y/N): " confirm
 
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
-        echo "   macOS may ask for your password to install updates."
-        INSTALL_OUT="$(sudo /usr/sbin/softwareupdate --install --all 2>&1 || true)"
-        echo "$INSTALL_OUT"
-
-        if echo "$INSTALL_OUT" | grep -q "No updates are available"; then
-            log_info "No updates available anymore"
-        elif echo "$INSTALL_OUT" | grep -qiE "installed|Done|restart"; then
-            log_ok "Updates installed"
+        if open "x-apple.systempreferences:com.apple.Software-Update-Settings.extension"; then
+            log_info "Software Update opened in System Settings; install the update there"
         else
-            log_warn "Update result unclear — check output above"
+            log_warn "Could not open Software Update; open System Settings manually"
         fi
     else
-        log_info "Updates skipped"
+        log_info "Updates not opened"
     fi
 fi
 

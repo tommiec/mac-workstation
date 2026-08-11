@@ -18,7 +18,7 @@ One-time setup. Runs automatically. Manual control when needed.
 |---|---|
 | `mm_install.sh` | Bootstrap setup (repo, CLI, launchd) |
 | `mm_auto.sh` | Automated weekly maintenance (launchd) |
-| `mm_maintain.sh` | Run maintenance now: Homebrew, optional cask upgrades, DNS flush, macOS updates, optional secrets backup, optional QuickTime history cleanup |
+| `mm_maintain.sh` | Run maintenance now: Homebrew, optional cask upgrades, DNS flush, macOS-update detection with a System Settings shortcut, optional secrets backup, optional QuickTime history cleanup |
 | `mm_doctor.sh` | Health checks and diagnostics (`mm doctor`) |
 | `mm_triage.sh` | Quick file/malware triage with hash, VirusTotal and strings (`mm triage`) |
 | `mm_backup.sh` | Back up SSH, GPG and the git profile in one encrypted-vault session (`mm backup`; called by `mm maintain`) |
@@ -222,7 +222,7 @@ configured, selftest asserts in a throwaway sandbox that the managed git hooks
 actually reject a per-repo identity override, an unknown remote and an outgoing
 commit with the wrong author. Doctor alone only ever exercises the happy path.
 
-`mm maintain` reports drift so keeping, uninstalling, or adopting into the `Brewfile` stays a deliberate choice: Homebrew packages installed outside the `Brewfile`, and apps in `/Applications` that did not come in through Homebrew (labelled App Store or manual install). It then asks before taking optional actions: upgrading outdated Homebrew casks, installing macOS updates, running `mm backup` (SSH, GPG keys/trust and git identity in one vault mount), and clearing QuickTime Player's recent documents history. The QuickTime cleanup removes QuickTime's app-specific recent-document shared-file-list entries and legacy QuickTime preference keys. It does not delete media files and does not clear system-wide macOS Recent Items.
+`mm maintain` reports drift so keeping, uninstalling, or adopting into the `Brewfile` stays a deliberate choice: Homebrew packages installed outside the `Brewfile`, and apps in `/Applications` that did not come in through Homebrew (labelled App Store or manual install). It then asks before taking optional actions: upgrading outdated Homebrew casks, opening macOS Software Update in System Settings, running `mm backup` (SSH, GPG keys/trust and git identity in one vault mount), and clearing QuickTime Player's recent documents history. Authentication for macOS updates is never collected in the terminal: System Settings handles it through its protected UI. The QuickTime cleanup removes QuickTime's app-specific recent-document shared-file-list entries and legacy QuickTime preference keys. It does not delete media files and does not clear system-wide macOS Recent Items.
 
 ## File triage
 

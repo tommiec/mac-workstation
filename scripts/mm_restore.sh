@@ -413,6 +413,13 @@ if [[ -d "$VAULT_MOUNT_POINT/pem-archive" ]]; then
     fi
 fi
 
+# Signing keys are not part of the profile: signing is opt-in per machine.
+# Query it as a boolean: a literal "false" must not be treated as enabled.
+if [[ "$(git config --global --type=bool --get commit.gpgsign 2>/dev/null)" == "true" ]] \
+    && [[ -z "$(git config --global --get user.signingkey)" ]]; then
+    log_warn "commit.gpgsign is on but user.signingkey is unset; commits will fail"
+fi
+
 summary_print
 echo
 
@@ -441,12 +448,6 @@ fi
 if [[ "$DO_GIT_PROFILE" -eq 1 && "$DRY_RUN" -eq 0 ]] \
     && [[ ! -f "${LOCAL_GIT_IDENTITY_PREFIX}-github" ]]; then
     log_info "No identity files yet; run 'mm install' to generate them from the profile"
-fi
-
-# Signing keys are not part of the profile: signing is opt-in per machine.
-if [[ -n "$(git config --global --get commit.gpgsign)" ]] \
-    && [[ -z "$(git config --global --get user.signingkey)" ]]; then
-    log_warn "commit.gpgsign is on but user.signingkey is unset; commits will fail"
 fi
 
 # A failed restore must not be recorded as success by the EXIT trap, or
