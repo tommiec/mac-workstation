@@ -24,6 +24,12 @@ cask "vlc"
 cask "discord"
 cask "firefox"
 cask "microsoft-teams"
+cask "whatsapp"
+
+# ── Casks: Productivity ─────────────────────────────────
+# Managed as separate casks; do not add microsoft-office alongside them.
+cask "microsoft-excel"
+cask "microsoft-word"
 
 # ── Casks: Security / networking ────────────────────────
 cask "balenaetcher"
