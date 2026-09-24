@@ -24,8 +24,8 @@ if [[ ! -d "$SSH_SOURCE" ]]; then
     exit 1
 fi
 
-if ! command -v diskutil >/dev/null 2>&1 || ! command -v hdiutil >/dev/null 2>&1 || ! command -v rsync >/dev/null 2>&1; then
-    echo "❌ Required macOS tools not found: diskutil, hdiutil, and rsync"
+if ! command -v diskutil >/dev/null 2>&1 || ! command -v rsync >/dev/null 2>&1; then
+    echo "❌ Required macOS tools not found: diskutil and rsync"
     exit 1
 fi
 

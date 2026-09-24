@@ -34,8 +34,8 @@ if [[ ! -f "$GIT_PROFILE_CONF" ]]; then
     exit 1
 fi
 
-if ! command -v diskutil >/dev/null 2>&1 || ! command -v hdiutil >/dev/null 2>&1; then
-    echo "❌ Required macOS tools not found: diskutil and hdiutil"
+if ! command -v diskutil >/dev/null 2>&1; then
+    echo "❌ Required macOS tool not found: diskutil"
     exit 1
 fi
 
