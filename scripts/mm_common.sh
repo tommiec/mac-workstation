@@ -506,7 +506,7 @@ vault_mount() {
     fi
 
     echo "Mounting vault..."
-    attach_out="$(hdiutil attach "$VAULT_PATH" -nobrowse)" || return 1
+    attach_out="$(diskutil image attach --mountOptions nobrowse "$VAULT_PATH")" || return 1
 
     # Take the mount point from the attach output instead of assuming
     # /Volumes/$VAULT_NAME: macOS mounts at "$VAULT_NAME 1" on a name clash.

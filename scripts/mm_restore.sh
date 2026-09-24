@@ -115,7 +115,7 @@ if [[ ! -e "$VAULT_PATH" ]]; then
     exit 1
 fi
 
-for tool in diskutil hdiutil rsync; do
+for tool in diskutil rsync; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "❌ Required tool not found: $tool"
         exit 1
