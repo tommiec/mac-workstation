@@ -8,7 +8,9 @@ cask "docker-desktop"
 cask "github"
 cask "gitkraken"
 cask "jetbrains-toolbox"
+cask "oracle-jdk@25"
 cask "postman"
+cask "scenebuilder"
 cask "visual-studio-code"
 cask "zed"
 
@@ -49,9 +51,7 @@ cask "utm"
 
 # ── Casks: Data / modeling ──────────────────────────────
 cask "mysqlworkbench"
-# visual-paradigm: cask broken upstream (vendor re-uploaded/unsigned builds,
-# 18.1 bump rejected in Homebrew/homebrew-cask#271475); re-add once a signed
-# release lands.
+# visual-paradigm: disabled until the upstream download checksum is stable.
 
 # ── CLI: Development ────────────────────────────────────
 brew "git"
