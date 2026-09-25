@@ -306,6 +306,14 @@ If you need an exact full restore instead, copy `gpg-backup/latest/full-gnupg/.g
 
 Unmount the vault after use and let iCloud Drive finish syncing before shutting down or editing it elsewhere.
 
+### Downloads and iCloud Drive
+
+`~/Downloads` stays a local folder, so AirDrop and browsers keep working without
+iCloud. When iCloud Drive is set up, `mm install` adds `~/Downloads/iCloud
+Downloads` as a shortcut to `iCloud Drive/Downloads`: only what you move in there
+syncs. An existing entry is never replaced. Cleanup tools that follow symlinks
+(`find -L`) cross into iCloud Drive, so do not point them at `~/Downloads`.
+
 ### Restore on a new Mac
 
 After a clean macOS install, `~/.ssh` and the GPG keyring are gone but the vault in iCloud Drive still holds them. Restore in this order.

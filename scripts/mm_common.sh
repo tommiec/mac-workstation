@@ -32,6 +32,9 @@ WORKSPACE_ROOT="$HOME/Repositories"
 WORKSPACE_SCOPES=(dev dossiers projects)
 BIN_DIR="$HOME/.local/bin"
 MM_PATH="$BIN_DIR/mm"
+ICLOUD_DRIVE_ROOT="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
+ICLOUD_DOWNLOADS_DIR="$ICLOUD_DRIVE_ROOT/Downloads"
+ICLOUD_DOWNLOADS_LINK="$HOME/Downloads/iCloud Downloads"
 
 # Interactive shells usually learn this through brew shellenv. launchd does
 # not read shell profiles, so make the standard Homebrew locations available
@@ -457,6 +460,30 @@ ensure_brew() {
     command -v brew &>/dev/null
 }
 
+# ~/Downloads stays local for AirDrop and browsers; this only adds a shortcut
+# into iCloud Drive. Skipped until iCloud Drive exists, so the CloudDocs root is
+# never fabricated, and an existing entry is never replaced.
+setup_icloud_downloads_link() {
+    local downloads_dir
+
+    if [[ ! -d "$ICLOUD_DRIVE_ROOT" ]]; then
+        log_info "iCloud Drive not set up yet; Downloads shortcut skipped"
+        return 0
+    fi
+    downloads_dir="$(dirname "$ICLOUD_DOWNLOADS_LINK")"
+    if [[ ! -d "$downloads_dir" ]]; then
+        log_warn "Local Downloads folder missing; shortcut skipped"
+        return 0
+    fi
+    [[ -e "$ICLOUD_DOWNLOADS_LINK" || -L "$ICLOUD_DOWNLOADS_LINK" ]] && return 0
+
+    if mkdir -p "$ICLOUD_DOWNLOADS_DIR" && ln -s "$ICLOUD_DOWNLOADS_DIR" "$ICLOUD_DOWNLOADS_LINK"; then
+        log_ok "iCloud Downloads shortcut created"
+    else
+        log_warn "Could not create iCloud Downloads shortcut"
+    fi
+}
+
 # ── Encrypted vault (iCloud sparsebundle) ───────────────
 # Shared by the SSH and GPG backup scripts. Usage pattern:
 #   ensure_vault    → create the sparsebundle on first use
@@ -465,13 +492,19 @@ ensure_brew() {
 #                     and left mounted)
 #   vault_eject     → call from the EXIT trap; only ejects what we mounted
 
-VAULT_PATH="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Secure Vault/Secrets.sparsebundle"
+VAULT_PATH="$ICLOUD_DRIVE_ROOT/Secure Vault/Secrets.sparsebundle"
 VAULT_NAME="Secrets"
 VAULT_SIZE="2g"
 VAULT_MOUNT_POINT=""
 VAULT_MOUNTED_BY_SCRIPT=0
 
 ensure_vault() {
+    if [[ ! -d "$ICLOUD_DRIVE_ROOT" ]]; then
+        echo "❌ iCloud Drive is not available at: $ICLOUD_DRIVE_ROOT"
+        echo "   Sign in to iCloud Drive and let it initialise before running a backup."
+        return 1
+    fi
+
     mkdir -p "$(dirname "$VAULT_PATH")" || return 1
     if [[ ! -e "$VAULT_PATH" ]]; then
         echo "Creating encrypted sparsebundle..."

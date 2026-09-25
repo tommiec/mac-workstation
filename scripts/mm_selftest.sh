@@ -123,6 +123,29 @@ expect_vault_handoff() {
     return "$result"
 }
 
+# Neither iCloud consumer may fabricate the CloudDocs root on a signed-out Mac.
+expect_no_fake_icloud_root() (
+    ICLOUD_DRIVE_ROOT="$WORK_DIR/signed-out/CloudDocs"
+    ICLOUD_DOWNLOADS_DIR="$ICLOUD_DRIVE_ROOT/Downloads"
+    ICLOUD_DOWNLOADS_LINK="$WORK_DIR/signed-out/iCloud Downloads"
+    VAULT_PATH="$ICLOUD_DRIVE_ROOT/Secure Vault/Secrets.sparsebundle"
+
+    setup_icloud_downloads_link >/dev/null
+    ! ensure_vault >/dev/null 2>&1 && [[ ! -e "$ICLOUD_DRIVE_ROOT" ]]
+)
+
+expect_icloud_downloads_link() (
+    ICLOUD_DRIVE_ROOT="$WORK_DIR/icloud-ready/CloudDocs"
+    ICLOUD_DOWNLOADS_DIR="$ICLOUD_DRIVE_ROOT/Downloads"
+    ICLOUD_DOWNLOADS_LINK="$WORK_DIR/icloud-ready/local/iCloud Downloads"
+
+    mkdir -p "$ICLOUD_DRIVE_ROOT" "$(dirname "$ICLOUD_DOWNLOADS_LINK")"
+    setup_icloud_downloads_link >/dev/null \
+        && [[ -d "$ICLOUD_DOWNLOADS_DIR" ]] \
+        && [[ -L "$ICLOUD_DOWNLOADS_LINK" ]] \
+        && [[ "$(readlink "$ICLOUD_DOWNLOADS_LINK")" == "$ICLOUD_DOWNLOADS_DIR" ]]
+)
+
 # ── Core backup/restore safeguards ──────────────────────
 
 echo "── core backup/restore safeguards ──"
@@ -134,6 +157,8 @@ expect_logic 0 "backup: --ssh selects SSH only" expect_backup_selection "1,0,0" 
 expect_logic 0 "backup: GPG and git flags compose" expect_backup_selection "0,1,1" --gpg --git-profile
 expect_logic 1 "backup: unknown option is rejected" expect_backup_rejects_unknown_option
 expect_logic 0 "backup: child reuses parent vault mount" expect_vault_handoff
+expect_logic 0 "icloud: never fabricates CloudDocs root" expect_no_fake_icloud_root
+expect_logic 0 "icloud: creates Downloads shortcut" expect_icloud_downloads_link
 echo
 
 # Creates a repo with the given remote and one commit. Hooks are skipped and the
