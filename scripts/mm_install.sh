@@ -119,6 +119,7 @@ setup_mm_command_path() {
 
 run_step "mm command PATH setup" setup_mm_command_path
 run_step "git excludes, hooks and identity setup" setup_git_global
+setup_icloud_downloads_link
 
 # ── Install apps ─────────────────────
 # The full app and CLI tool list is declarative in the Brewfile; brew bundle

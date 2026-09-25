@@ -88,6 +88,14 @@ else
     check_fail "Wrapper missing: $MM_PATH"
 fi
 
+if [[ ! -d "$ICLOUD_DRIVE_ROOT" ]]; then
+    echo "ℹ️  iCloud Drive is unavailable; optional Downloads shortcut not checked"
+elif [[ "$(readlink "$ICLOUD_DOWNLOADS_LINK" 2>/dev/null)" == "$ICLOUD_DOWNLOADS_DIR" ]]; then
+    check_ok "iCloud Downloads shortcut present"
+else
+    check_warn "iCloud Downloads shortcut missing or unexpected: $ICLOUD_DOWNLOADS_LINK"
+fi
+
 # ── Git hygiene ─────────────────────────────────────────
 
 echo
