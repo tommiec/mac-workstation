@@ -60,11 +60,6 @@ parse_backup_options() {
     fi
 }
 
-cleanup() {
-    local status="$1"
-    vault_eject
-    record_script_result "mm_backup.sh" "$status"
-}
 run_backup() {
     local label="$1"
     local script="$2"
@@ -89,7 +84,7 @@ main() {
     fi
 
     BACKUP_FAILED=0
-    trap 'status=$?; cleanup "$status"' EXIT
+    trap 'finish_vault_run "mm_backup.sh" "$?"' EXIT
 
     echo "── 🔐 Secrets backup ──"
     echo

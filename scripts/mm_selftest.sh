@@ -10,8 +10,8 @@
 # proves the happy path.
 #
 # Runs entirely in a temporary directory and never touches a real repository.
-# Forge URLs and the expected identity are read from the installed profile, so
-# no address or internal hostname is hard-coded here.
+# Uses temporary Git configuration and example.com identities, with hooks
+# from this checkout. No installed profile or workstation setup is required.
 #
 # Policy: ~/Repositories/GIT.md
 # =========================================================
@@ -24,24 +24,35 @@ source "$SCRIPTS_DIR/mm_common.sh"
 # mm_backup.sh only runs main when executed directly, so sourcing it gives this
 # test access to its option parser without mounting the vault.
 source "$SCRIPTS_DIR/mm_backup.sh"
-trap 'record_script_result "mm_selftest.sh" "$?"' EXIT
 
 PASS_COUNT=0
 FAIL_COUNT=0
 ZERO_SHA="0000000000000000000000000000000000000000"
 
-if [[ ! -f "$GIT_PROFILE_CONF" ]]; then
-    echo "❌ No git profile at $GIT_PROFILE_CONF — run 'mm restore --git-profile --apply'"
-    exit 1
-fi
-if [[ ! -x "$LOCAL_GIT_HOOKS_DIR/pre-commit" || ! -x "$LOCAL_GIT_HOOKS_DIR/pre-push" ]]; then
-    echo "❌ Managed hooks are not installed — run 'mm install'"
-    exit 1
-fi
-
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mm-selftest.XXXXXX")" || exit 1
 cleanup_work() { rm -rf "$WORK_DIR"; }
-trap 'status=$?; cleanup_work; record_script_result "mm_selftest.sh" "$status"' EXIT
+trap 'cleanup_work' EXIT
+
+# Isolate Git configuration; no installed profile, credentials or hooks needed.
+export XDG_CONFIG_HOME="$WORK_DIR/config"
+export GIT_CONFIG_GLOBAL="$WORK_DIR/gitconfig"
+export GIT_CONFIG_NOSYSTEM=1
+mkdir -p "$XDG_CONFIG_HOME/git"
+GIT_PROFILE_CONF="$XDG_CONFIG_HOME/git/profile"
+LOCAL_GIT_IDENTITY_PREFIX="$XDG_CONFIG_HOME/git/identity"
+git config --file "$GIT_PROFILE_CONF" user.name "Self Test"
+git config --file "$GIT_PROFILE_CONF" user.email "test@example.com"
+for forge in first second; do
+    git config --file "$GIT_PROFILE_CONF" "forge.$forge.url" "https://$forge.example.com/**"
+    git config --file "$LOCAL_GIT_IDENTITY_PREFIX-$forge" user.name "Self Test"
+    git config --file "$LOCAL_GIT_IDENTITY_PREFIX-$forge" user.email "test@example.com"
+    git config --global "includeIf.hasconfig:remote.*.url:https://$forge.example.com/**.path" "$LOCAL_GIT_IDENTITY_PREFIX-$forge"
+done
+git config --global commit.gpgsign false
+git config --global core.hooksPath /dev/null
+
+# Test repository hooks, independently of the installed copies.
+LOCAL_GIT_HOOKS_DIR="$CONFIGS_DIR/hooks"
 
 echo "── 🧪 mm selftest ──"
 echo
@@ -146,6 +157,26 @@ expect_icloud_downloads_link() (
         && [[ "$(readlink "$ICLOUD_DOWNLOADS_LINK")" == "$ICLOUD_DOWNLOADS_DIR" ]]
 )
 
+expect_failed_step() (
+    STEP_FAILED=0
+    run_step "expected failure" false >/dev/null
+    [[ "$STEP_FAILED" -eq 1 ]]
+)
+
+expect_failed_eject() (
+    VAULT_MOUNT_POINT="$WORK_DIR/mounted-vault"
+    VAULT_MOUNTED_BY_SCRIPT=1
+    diskutil() { return 1; }
+    ! vault_eject >/dev/null 2>&1
+)
+
+expect_successful_eject() (
+    VAULT_MOUNT_POINT="$WORK_DIR/mounted-vault"
+    VAULT_MOUNTED_BY_SCRIPT=1
+    diskutil() { return 0; }
+    vault_eject >/dev/null && [[ "$VAULT_MOUNTED_BY_SCRIPT" -eq 0 ]]
+)
+
 # ── Core backup/restore safeguards ──────────────────────
 
 echo "── core backup/restore safeguards ──"
@@ -159,6 +190,9 @@ expect_logic 1 "backup: unknown option is rejected" expect_backup_rejects_unknow
 expect_logic 0 "backup: child reuses parent vault mount" expect_vault_handoff
 expect_logic 0 "icloud: never fabricates CloudDocs root" expect_no_fake_icloud_root
 expect_logic 0 "icloud: creates Downloads shortcut" expect_icloud_downloads_link
+expect_logic 0 "failed step marks run failed" expect_failed_step
+expect_logic 0 "failed eject is propagated" expect_failed_eject
+expect_logic 0 "successful eject releases ownership" expect_successful_eject
 echo
 
 # Creates a repo with the given remote and one commit. Hooks are skipped and the

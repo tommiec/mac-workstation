@@ -43,8 +43,7 @@ cleanup() {
     if [[ -n "$TMP_BACKUP" && -d "$TMP_BACKUP" ]]; then
         rm -rf "$TMP_BACKUP"
     fi
-    vault_eject
-    record_script_result "mm_backup_gpg.sh" "$status"
+    finish_vault_run "mm_backup_gpg.sh" "$status"
 }
 trap 'status=$?; cleanup "$status"' EXIT
 

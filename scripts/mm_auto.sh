@@ -11,7 +11,7 @@
 #   - Pulls the latest scripts from GitHub (git checkout only)
 #   - Updates and cleans up Homebrew formulas
 #   - Detects macOS updates and reports them through a notification
-#   - Deletes old cache files (>7 days)
+#   - Removes old Mac Manager logs
 # =========================================================
 
 set -o pipefail
@@ -34,7 +34,7 @@ run_quiet_step() {
     local tmp_out
 
     tmp_out="$(mktemp "${TMPDIR:-/tmp}/mm_auto_step.XXXXXX")" || {
-        log_warn "$msg failed (could not create temp log)"
+        log_error "$msg failed (could not create temp log)"
         return 1
     }
 
@@ -44,7 +44,7 @@ run_quiet_step() {
         log_ok "$msg"
     else
         cat "$tmp_out" >> "$RUN_LOG"
-        log_warn "$msg failed"
+        log_error "$msg failed"
         echo "      Last output:"
         tail -n 12 "$tmp_out" | sed 's/^/      /'
         rm -f "$tmp_out"
@@ -67,7 +67,7 @@ if [[ -d "$REPO_ROOT/.git" ]] && command -v git &>/dev/null; then
             log_ok "Scripts updated from GitHub"
         fi
     else
-        log_warn "Script update failed (offline or diverged); continuing with local version"
+        log_error "Script update failed (offline or diverged); continuing with local version"
     fi
 fi
 
@@ -81,9 +81,12 @@ echo "── 🍺 Homebrew ─────────────────�
 if command -v brew &>/dev/null; then
     run_quiet_step "brew update" brew update
 
-    OUTDATED_FORMULAS="$(brew outdated --formula --quiet 2>/dev/null || true)"
+    OUTDATED_STATUS=0
+    OUTDATED_FORMULAS="$(brew outdated --formula --quiet)" || OUTDATED_STATUS=$?
     OUTDATED_COUNT="$(echo "$OUTDATED_FORMULAS" | awk 'NF { count++ } END { print count + 0 }')"
-    if [[ "$OUTDATED_COUNT" -eq 0 ]]; then
+    if [[ "$OUTDATED_STATUS" -ne 0 ]]; then
+        log_error "Could not check outdated Homebrew formulas"
+    elif [[ "$OUTDATED_COUNT" -eq 0 ]]; then
         log_ok "No outdated Homebrew formulas"
     else
         echo "   ℹ️  $OUTDATED_COUNT Homebrew formula(s) to upgrade"
@@ -96,7 +99,7 @@ if command -v brew &>/dev/null; then
     run_quiet_step "brew cleanup" brew cleanup --prune=30
     run_quiet_step "brew autoremove" brew autoremove
 else
-    log_warn "brew unavailable — skipping brew steps"
+    log_error "brew unavailable — skipping brew steps"
 fi
 
 # Detect upgrades by observed state, independent of who ran `brew upgrade` or
@@ -112,7 +115,7 @@ if command -v ollama >/dev/null 2>&1 \
         if restart_ollama_service && wait_for_ollama; then
             log_ok "Ollama restarted after version change ($OLLAMA_SERVER_VERSION → $OLLAMA_CLI_VERSION)"
         else
-            log_warn "Ollama restart after version change failed"
+            log_error "Ollama restart after version change failed"
         fi
     fi
 fi
@@ -124,34 +127,20 @@ fi
 echo
 echo "── 🍎 macOS ──────────────────────────────────────"
 
-UPDATES="$(/usr/sbin/softwareupdate --list 2>&1 || true)"
+UPDATE_STATUS=0
+UPDATES="$(/usr/sbin/softwareupdate --list 2>&1)" || UPDATE_STATUS=$?
 COUNT="$(count_macos_updates "$UPDATES")"
 
-if [[ "$COUNT" -eq 0 ]]; then
+if [[ "$UPDATE_STATUS" -ne 0 ]]; then
+    log_error "macOS update check failed: $UPDATES"
+elif [[ "$COUNT" -eq 0 ]]; then
     log_ok "No macOS updates available"
 else
     log_warn "$COUNT macOS update(s) available"
     notify_user "macOS updates available" "Use 'mm maintain' to open Software Update."
 fi
 
-# ── Cache cleanup ────────────────────
-# Deletes files older than 7 days from ~/Library/Caches.
-# System folders actively used by launchd services
-# (for example com.apple.bird for iCloud) are intentionally not excluded:
-# files older than 7 days are rarely in use there at 02:00.
-# Adjust the -mtime threshold if this causes issues.
-
-echo
-echo "── 🧹 Cache cleanup ──────────────────────────────"
-
-DELETED=$(
-    /usr/bin/find "$HOME/Library/Caches" \
-        -type f -mtime +7 \
-        -print -delete 2>/dev/null \
-    | /usr/bin/wc -l \
-    | /usr/bin/tr -d ' '
-)
-log_ok "$DELETED old cache file(s) deleted"
+# ── Manager log retention ──────────────────────────────
 
 OLD_LOG_COUNT=$(
     /usr/bin/find "$LOG_DIR" \
@@ -175,3 +164,4 @@ log_ok "$OLD_LOG_COUNT manager log(s) older than $LOG_RETENTION_DAYS days delete
 notify_user "Mac Manager completed" "Maintenance finished."
 
 summary_print
+exit "$STEP_FAILED"

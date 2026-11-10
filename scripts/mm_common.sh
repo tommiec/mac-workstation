@@ -87,6 +87,7 @@ AUTO_MINUTE=0
 
 STEP_OK=0
 STEP_WARN=0
+STEP_FAILED=0
 SUMMARY=()
 
 log_ok() {
@@ -103,6 +104,11 @@ log_warn() {
 
 log_info() {
     echo "   ℹ️  $*"
+}
+
+log_error() {
+    log_warn "$*"
+    STEP_FAILED=1
 }
 
 # Git stores boolean configuration as text. Query through --type=bool so an
@@ -143,7 +149,7 @@ run_step() {
     if "$@"; then
         log_ok "$msg"
     else
-        log_warn "$msg failed"
+        log_error "$msg failed"
     fi
 }
 
@@ -488,8 +494,8 @@ setup_icloud_downloads_link() {
 # Shared by the SSH and GPG backup scripts. Usage pattern:
 #   ensure_vault    → create the sparsebundle on first use
 #   vault_mount     → sets VAULT_MOUNT_POINT; VAULT_MOUNTED_BY_SCRIPT=1 when
-#                     this process mounted it (an already-open vault is reused
-#                     and left mounted)
+#                     this process attached it; child backup scripts reuse
+#                     the parent's mount)
 #   vault_eject     → call from the EXIT trap; only ejects what we mounted
 
 VAULT_PATH="$ICLOUD_DRIVE_ROOT/Secure Vault/Secrets.sparsebundle"
@@ -532,12 +538,6 @@ vault_mount() {
         return 0
     fi
 
-    if [[ -d "/Volumes/$VAULT_NAME" ]]; then
-        VAULT_MOUNT_POINT="/Volumes/$VAULT_NAME"
-        echo "Using already mounted vault: $VAULT_MOUNT_POINT"
-        return 0
-    fi
-
     echo "Mounting vault..."
     attach_out="$(diskutil image attach --mountOptions nobrowse "$VAULT_PATH")" || return 1
 
@@ -551,10 +551,23 @@ vault_mount() {
     VAULT_MOUNTED_BY_SCRIPT=1
 }
 
+# EXIT-trap helper: preserve the run result unless ejecting fails.
+finish_vault_run() {
+    local script="$1" status="$2"
+    vault_eject || status=1
+    record_script_result "$script" "$status"
+    exit "$status"
+}
+
 vault_eject() {
     if [[ "$VAULT_MOUNTED_BY_SCRIPT" -eq 1 && -n "$VAULT_MOUNT_POINT" && -d "$VAULT_MOUNT_POINT" ]]; then
-        diskutil eject "$VAULT_MOUNT_POINT" >/dev/null 2>&1 || true
+        if ! diskutil eject "$VAULT_MOUNT_POINT"; then
+            echo "❌ Could not eject vault: $VAULT_MOUNT_POINT — close files and eject it manually" >&2
+            return 1
+        fi
+        VAULT_MOUNTED_BY_SCRIPT=0
     fi
+    return 0
 }
 
 # ── LaunchAgent ─────────────────────────────────────────

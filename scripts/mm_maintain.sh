@@ -68,7 +68,9 @@ UNMANAGED="$(list_unmanaged_packages)"
 if [[ -z "$UNMANAGED" ]]; then
     log_ok "No packages installed outside the Brewfile"
 else
-    log_warn "Packages installed outside the Brewfile — add to the Brewfile or uninstall:"
+    UNMANAGED_COUNT="$(printf '%s\n' "$UNMANAGED" \
+        | awk '!/^Would uninstall (formulae|casks):/ && NF { count++ } END { print count + 0 }')"
+    log_warn "$UNMANAGED_COUNT package(s) installed outside the Brewfile"
     echo "$UNMANAGED" | sed 's/^/      /'
 fi
 
@@ -76,17 +78,21 @@ UNMANAGED_APPS="$(list_unmanaged_apps)"
 if [[ -z "$UNMANAGED_APPS" ]]; then
     log_ok "All apps in /Applications are Homebrew-managed"
 else
-    log_warn "Apps in /Applications not managed by Homebrew:"
+    UNMANAGED_APP_COUNT="$(printf '%s\n' "$UNMANAGED_APPS" | awk 'NF { count++ } END { print count + 0 }')"
+    log_warn "$UNMANAGED_APP_COUNT app(s) in /Applications not managed by Homebrew"
     echo "$UNMANAGED_APPS" | sed 's/^/      /'
 fi
 
-OUTDATED_CASKS_RAW="$(brew outdated --cask --quiet 2>/dev/null || true)"
+OUTDATED_STATUS=0
+OUTDATED_CASKS_RAW="$(brew outdated --cask --quiet)" || OUTDATED_STATUS=$?
 OUTDATED_CASK_COUNT="$(printf '%s\n' "$OUTDATED_CASKS_RAW" | awk 'NF { count++ } END { print count + 0 }')"
 
-if [[ "$OUTDATED_CASK_COUNT" -eq 0 ]]; then
+if [[ "$OUTDATED_STATUS" -ne 0 ]]; then
+    log_error "Could not check outdated Homebrew casks"
+elif [[ "$OUTDATED_CASK_COUNT" -eq 0 ]]; then
     log_ok "No outdated Homebrew casks"
 else
-    log_warn "$OUTDATED_CASK_COUNT Homebrew cask(s) available for upgrade"
+    log_info "$OUTDATED_CASK_COUNT Homebrew cask(s) available for upgrade"
     while IFS= read -r cask; do
         [[ -n "$cask" ]] && echo "      - $cask"
     done <<< "$OUTDATED_CASKS_RAW"
@@ -115,10 +121,10 @@ else
         if [[ "$CASK_FAILED" -eq 0 ]]; then
             log_ok "Homebrew casks upgraded ($CASK_UPGRADED)"
         else
-            log_warn "Homebrew casks: $CASK_UPGRADED upgraded, $CASK_FAILED failed ($CASK_FAILED_NAMES)"
+            log_error "Homebrew casks: $CASK_UPGRADED upgraded, $CASK_FAILED failed ($CASK_FAILED_NAMES)"
         fi
     else
-        log_info "Homebrew cask upgrades skipped"
+        log_warn "$OUTDATED_CASK_COUNT Homebrew cask(s) remain outdated (upgrade skipped)"
     fi
 fi
 
@@ -131,7 +137,7 @@ echo "   macOS may ask for your password to flush DNS."
 if sudo /bin/sh -c 'dscacheutil -flushcache && killall -HUP mDNSResponder'; then
     log_ok "DNS cache flushed"
 else
-    log_warn "DNS flush failed"
+    log_error "DNS flush failed"
 fi
 
 # ── macOS updates ────────────────────
@@ -139,11 +145,14 @@ fi
 echo
 echo "── 🍎 macOS updates ──────────────────────────────"
 
-UPDATES="$(/usr/sbin/softwareupdate --list 2>&1 || true)"
+UPDATE_STATUS=0
+UPDATES="$(/usr/sbin/softwareupdate --list 2>&1)" || UPDATE_STATUS=$?
 echo "$UPDATES" >> "$RUN_LOG"
 COUNT="$(count_macos_updates "$UPDATES")"
 
-if [[ "$COUNT" -eq 0 ]]; then
+if [[ "$UPDATE_STATUS" -ne 0 ]]; then
+    log_error "macOS update check failed: $UPDATES"
+elif [[ "$COUNT" -eq 0 ]]; then
     log_ok "No macOS updates available"
 else
     log_warn "$COUNT macOS update(s) available"
@@ -177,7 +186,7 @@ if [[ "$confirm_backup" =~ ^[Yy]$ ]]; then
     if bash "$SCRIPT_DIR/mm_backup.sh"; then
         log_ok "Secrets backup completed"
     else
-        log_warn "Secrets backup incomplete"
+        log_error "Secrets backup incomplete"
     fi
 else
     log_info "Secrets backup skipped"
@@ -229,7 +238,7 @@ clear_quicktime_history() {
     fi
 
     if [[ "$failed" -ne 0 ]]; then
-        log_warn "QuickTime history cleanup incomplete"
+        log_error "QuickTime history cleanup incomplete"
         return 1
     fi
 
@@ -254,3 +263,4 @@ fi
 notify_user "Mac Manager completed" "Maintenance run finished."
 
 summary_print
+exit "$STEP_FAILED"

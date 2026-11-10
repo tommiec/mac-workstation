@@ -89,7 +89,7 @@ echo "── 🍺 Homebrew ─────────────────�
 if ensure_brew; then
     log_ok "Homebrew available"
 else
-    log_warn "Homebrew installation failed"
+    log_error "Homebrew installation failed"
     exit 1
 fi
 
@@ -132,7 +132,7 @@ if [[ -f "$BREWFILE" ]]; then
     run_step "brew bundle install (Brewfile)" \
         brew bundle install --file "$BREWFILE" --no-upgrade
 else
-    log_warn "Brewfile not found: $BREWFILE"
+    log_error "Brewfile not found: $BREWFILE"
 fi
 
 echo
@@ -144,7 +144,7 @@ if configure_ollama_service && wait_for_ollama; then
     log_ok "Ollama Mac Manager service running at $OLLAMA_HOST"
     log_info "Ollama has no API authentication; expose it only on a trusted LAN"
 else
-    log_warn "Ollama Mac Manager service setup failed"
+    log_error "Ollama Mac Manager service setup failed"
 fi
 
 if [[ "$OLLAMA_READY" -eq 1 ]]; then
@@ -169,10 +169,10 @@ if [[ "$OLLAMA_READY" -eq 1 ]]; then
     if [[ "$MODEL_FAILED" -eq 0 ]]; then
         log_ok "Ollama models: $MODEL_PRESENT already present, $MODEL_INSTALLED installed"
     else
-        log_warn "Ollama models: $MODEL_PRESENT already present, $MODEL_INSTALLED installed, $MODEL_FAILED failed ($MODEL_FAILED_NAMES)"
+        log_error "Ollama models: $MODEL_PRESENT already present, $MODEL_INSTALLED installed, $MODEL_FAILED failed ($MODEL_FAILED_NAMES)"
     fi
 else
-    log_warn "Ollama model installation skipped because the service is unavailable"
+    log_error "Ollama model installation skipped because the service is unavailable"
 fi
 
 run_step "brew cleanup" brew cleanup
@@ -180,12 +180,12 @@ run_step "brew cleanup" brew cleanup
 echo
 echo "── 🕰  Automation ────────────────────────────────"
 
-write_auto_launch_agent
+run_step "Write maintenance LaunchAgent" write_auto_launch_agent
 
 if load_auto_launch_agent; then
     log_ok "Auto-maintenance scheduled for Saturday $(printf '%02d:%02d' "$AUTO_HOUR" "$AUTO_MINUTE")"
 else
-    log_warn "Failed to load LaunchAgent"
+    log_error "Failed to load LaunchAgent"
 fi
 
 # ── Summary ──────────────────────────
@@ -203,3 +203,5 @@ if ! echo "$PATH" | tr ':' '\n' | grep -Fxq "$BIN_DIR"; then
     # shellcheck disable=SC2016
     echo '         export PATH="$HOME/.local/bin:$PATH"'
 fi
+
+exit "$STEP_FAILED"

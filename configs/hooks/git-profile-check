@@ -9,7 +9,7 @@
 #        git-profile-check push     (pre-push stdin format on stdin)
 
 mode="${1:-commit}"
-identity_dir="$HOME/.config/git"
+identity_dir="${XDG_CONFIG_HOME:-$HOME/.config}/git"
 
 # Origin of a config value, without the "file:" prefix and the value itself.
 config_origin() {

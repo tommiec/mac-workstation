@@ -127,15 +127,7 @@ if [[ "$DO_GPG" -eq 1 ]] && ! command -v gpg >/dev/null 2>&1; then
     exit 1
 fi
 
-# Invoked from the EXIT trap below; shellcheck cannot see through the quoted
-# trap body.
-# shellcheck disable=SC2329
-cleanup() {
-    local status="$1"
-    vault_eject
-    record_script_result "mm_restore.sh" "$status"
-}
-trap 'status=$?; cleanup "$status"' EXIT
+trap 'finish_vault_run "mm_restore.sh" "$?"' EXIT
 
 if ! vault_mount; then
     echo "❌ Could not mount the vault"

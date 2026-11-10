@@ -34,12 +34,7 @@ if ! ensure_vault; then
     exit 1
 fi
 
-cleanup() {
-    local status="$1"
-    vault_eject
-    record_script_result "mm_backup_ssh.sh" "$status"
-}
-trap 'status=$?; cleanup "$status"' EXIT
+trap 'finish_vault_run "mm_backup_ssh.sh" "$?"' EXIT
 
 if ! vault_mount; then
     echo "❌ Could not mount encrypted sparsebundle"
