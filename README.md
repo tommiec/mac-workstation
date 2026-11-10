@@ -1,53 +1,12 @@
 # mac-workstation
 
-My personal macOS workstation setup: Homebrew tooling, scheduled maintenance, diagnostics, and file/security triage.
+Personal macOS setup for Homebrew tooling, weekly maintenance, diagnostics,
+local AI and encrypted recovery backups.
 
-## Why this exists
+> The `Brewfile` reflects my workstation. Fork the repository and review it
+> before using the installer elsewhere. `mm` stands for **Mac Manager**.
 
-A consistent, low-effort way to bootstrap my Mac, keep core tooling maintained, and support day-to-day IT, DevOps, AI, and security work.
-
-One-time setup. Runs automatically. Manual control when needed.
-
-> **Using this yourself?** The app list in the `Brewfile` is mine. Fork the repo and replace it with your own before running the installer.
->
-> `mm` stands for **Mac Manager**.
-
-## Scripts
-
-| Script | Purpose |
-|---|---|
-| `mm_install.sh` | Bootstrap setup (repo, CLI, launchd) |
-| `mm_auto.sh` | Automated weekly maintenance (launchd) |
-| `mm_maintain.sh` | Run maintenance now: Homebrew, optional cask upgrades, DNS flush, macOS-update detection with a System Settings shortcut, optional secrets backup, optional QuickTime history cleanup |
-| `mm_doctor.sh` | Health checks and diagnostics (`mm doctor`) |
-| `mm_triage.sh` | Quick file/malware triage with hash, VirusTotal and strings (`mm triage`) |
-| `mm_backup.sh` | Back up SSH, GPG and the git profile in one encrypted-vault session (`mm backup`; called by `mm maintain`) |
-| `mm_backup_ssh.sh` | Backup `~/.ssh` to an encrypted iCloud sparsebundle |
-| `mm_backup_gpg.sh` | Backup GPG keys, ownertrust and `~/.gnupg` to the encrypted iCloud sparsebundle |
-| `mm_backup_git.sh` | Backup the git commit identity to the encrypted iCloud sparsebundle |
-| `mm_restore.sh` | Restore SSH material, GPG material and the git identity from the vault onto a new Mac (`mm restore`, dry run by default) |
-| `mm_selftest.sh` | Assert git identity hooks and core backup/restore safeguards (`mm selftest`) |
-| `mm_common.sh` | Shared configuration and helpers |
-
-The managed apps and CLI tools are declared in the repo-root `Brewfile` and installed with `brew bundle`.
-
-## How it works
-
-Scripts are managed using a **repo + CLI model**:
-
-```
-~/Repositories/dev/mac-workstation      → source and runtime (git repo)
-~/.local/bin/mm                         → CLI entrypoint
-~/Library/Logs/mac_manager/             → logs
-```
-
-- The repo contains the runtime scripts and is version-controlled
-- The `mm` command provides a simple interface
-- launchd runs the auto-maintenance script directly from the repository
-
-## Installation
-
-Clone the repo and run the installer once:
+## Install
 
 ```bash
 mkdir -p ~/Repositories/dev
@@ -55,303 +14,167 @@ git clone https://github.com/tommiec/mac-workstation.git ~/Repositories/dev/mac-
 bash ~/Repositories/dev/mac-workstation/scripts/mm_install.sh
 ```
 
-If `git` is not available yet, run `xcode-select --install`, complete the
-Command Line Tools installation, and then repeat the commands above.
+Install the Command Line Tools first with `xcode-select --install` if `git` is
+not yet available.
 
-The installer will:
-- set up Homebrew (if needed)
-- install all apps and CLI tools from the `Brewfile` (via `brew bundle`)
-- install the `mm` command in `~/.local/bin`
-- configure global Git excludes, a local Git hooks path and the per-forge commit
-  identity
-- start Ollama as a persistent user service and pull the managed models
-- register the weekly launchd job
+`mm install` installs the `Brewfile`, creates `~/.local/bin/mm`, configures Git
+hygiene, starts the managed Ollama service and registers weekly maintenance.
+It also adds `~/.local/bin` to `PATH` through `~/.zshrc` when needed.
 
-The installer ensures that the user-local command folder is in your shell path
-by adding this line to `~/.zshrc` when it is not already present:
+Update the checkout with:
 
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
+git -C ~/Repositories/dev/mac-workstation pull --ff-only
 ```
 
-To update later:
+Script changes are active immediately. Rerun `mm install` only after changing
+installer-managed setup such as the `Brewfile`, LaunchAgents or `mm` wrapper.
 
-```bash
-cd ~/Repositories/dev/mac-workstation
-git pull --ff-only
-```
+## Commands
 
-Normal script changes are active directly after `git pull`. Run `mm install` only if you changed installer-managed setup: the app list, LaunchAgent schedule, or `mm` wrapper.
+| Command | Purpose |
+|---|---|
+| `mm maintain` | Interactive Homebrew, macOS, backup and cleanup maintenance |
+| `mm backup` | Back up SSH, GPG and Git identity in one vault session |
+| `mm restore` | Preview a restore; add `--apply` to write changes |
+| `mm doctor` | Audit the installed setup and report drift |
+| `mm selftest` | Test Git guards and backup/restore safeguards in a sandbox |
+| `mm triage <file>` | Inspect a suspicious file |
+| `mm install` | Install or refresh managed setup |
+| `mm auto` | Run the non-interactive weekly maintenance now |
+| `mm help` | Show command help |
 
-### Ollama for the local network
+Automatic maintenance runs every Saturday at 02:00 through a user
+LaunchAgent. Failures return a nonzero status; informational drift does not.
 
-Homebrew installs the Ollama binary. `mm install` stops Homebrew's optional
-service and registers one Mac Manager-owned LaunchAgent
-(`local.mac-manager.ollama`) that listens on all network interfaces at port
-`11434`. Its settings cannot be overwritten by `brew services` or an Ollama
-upgrade. The installer then installs these models when missing:
+## Layout
 
 ```text
-devstral:24b
-qwen3-coder:30b
-gemma3:27b
-qwen2.5-coder:14b
+~/Repositories/dev/mac-workstation   source and runtime
+~/.local/bin/mm                      CLI entrypoint
+~/Library/Logs/mac_manager/          logs and run status
 ```
 
-Allow roughly 60 GB of model storage under `~/.ollama/models`. From the NAS,
-test the connection using the Mac's stable LAN address:
+GitHub is the canonical source. iCloud Drive is used only for the encrypted
+backup vault and an optional Downloads shortcut.
 
-```bash
-curl http://MAC_LAN_IP:11434/api/tags
-```
+## Maintenance and diagnostics
 
-Large model pulls use up to four attempts with delays of 10, 20, and 40
-seconds. Ollama retains partial downloads between attempts, resumes them on the
-next `pull`, and verifies every downloaded blob against its SHA-256 digest
-before writing the model manifest. The installer additionally requires
-`ollama show` to read the completed model successfully. Re-running `mm install`
-continues any model that still failed after all attempts.
+`mm maintain` updates Homebrew formulae, offers optional cask upgrades, flushes
+DNS, detects macOS updates, offers `mm backup`, and can clear QuickTime's recent
+document history. macOS updates are opened in System Settings so authentication
+never passes through the terminal.
 
-The service enables Flash Attention, uses a `q8_0` KV cache, and limits Ollama
-to one loaded model and one parallel request. This is intentional for a Mac
-with 36 GB unified memory: every managed model fits individually without trying
-to keep multiple 14–19 GB model images resident at once.
+`mm doctor` is read-only. It checks installation drift, Homebrew, Ollama, Git,
+SSH hygiene, logs and recent script results. `mm selftest` complements it by
+proving that safety checks reject invalid states.
 
-Mac Manager owns the persistent configuration at
-`~/Library/LaunchAgents/local.mac-manager.ollama.plist`. `RunAtLoad` and
-`KeepAlive` make it start after login and restart after a crash. `mm auto`
-compares the running server version with the installed CLI and restarts a loaded
-agent when they differ, including after a manual or partially failed Homebrew
-upgrade. Re-running `mm install` leaves an identical loaded service untouched,
-so active models and NAS requests are not interrupted.
+## Ollama
 
-Ollama's local API has no authentication. Binding it to `0.0.0.0:11434`
-therefore makes model execution available to every device that can reach that
-port. Use this only on a trusted LAN, do not forward port `11434` on the router,
-and restrict access with the macOS firewall or a separate authenticated reverse
-proxy when needed. The Mac must be logged in and awake because Ollama runs as a
-user LaunchAgent; reserving its LAN address in DHCP keeps the NAS endpoint
-stable. Remember that a MacBook roams: on café, hotel, or guest Wi-Fi, the
-unauthenticated API is exposed to peers on that network too. Stop it before
-leaving a trusted LAN with:
+`mm install` manages Ollama through
+`~/Library/LaunchAgents/local.mac-manager.ollama.plist`, installs the models
+declared in `scripts/mm_common.sh`, and listens on `0.0.0.0:11434` for LAN use.
+
+The Ollama API has no authentication. Use it only on a trusted network, never
+forward port `11434`, and stop the service before joining an untrusted network:
 
 ```bash
 launchctl bootout "gui/$(id -u)/local.mac-manager.ollama"
 ```
 
-Start it again from its persistent configuration with:
+The Mac must be logged in and awake. `mm auto` restarts the service after an
+Ollama upgrade when the running server and installed CLI differ.
 
-```bash
-launchctl bootstrap "gui/$(id -u)" \
-  "$HOME/Library/LaunchAgents/local.mac-manager.ollama.plist"
-```
+## Git identity and hooks
 
-### Local Git config bootstrap
-
-`mm install` configures the machine-wide Git hygiene baseline:
-
-- `configs/git-ignore-global` is copied to `~/.config/git/ignore`
-- Git is configured with `core.excludesFile=~/.config/git/ignore`
-- Git is configured with `core.hooksPath=~/.config/git/hooks`
-
-The repository also contains the managed local ignore rules and the managed
-hooks:
-
-```text
-configs/
-  ignore.local
-  git-profile.conf.example
-  hooks/
-    commit-msg
-    git-profile-check
-    pre-commit
-    pre-push
-```
-
-During installation:
-
-- `ignore.local` is copied to `~/.config/git/ignore.local`
-- every file in `hooks/` is copied to `~/.config/git/hooks/` and made executable
-- `ignore.local` is appended to the generated `~/.config/git/ignore`
-
-This keeps all Git hygiene configuration versioned and reproducible from the
-same source. `mm doctor` verifies that the installed local excludes and every
-managed hook match the repository versions.
-
-#### Commit identity
-
-Identity is set **per forge**, never globally, so repos on GitHub and on the
-self-hosted Forgejo each get the right author without per-clone configuration.
-`mm install` generates `~/.config/git/identity-<forge>` plus the matching
-`includeIf` rules in `~/.gitconfig` from a single machine-local file:
+`mm install` configures shared excludes, managed hooks and
+`user.useConfigOnly=true`. Commit identity is selected per forge from:
 
 ```text
 ~/.config/git/git-profile.conf
 ```
 
-That file is the only place holding the name, the address and the forge URLs. It
-is **not** stored in this repository: this repo is public, and those values are
-personal data and internal network topology. `configs/git-profile.conf.example`
-documents the format; the real file is mirrored into the encrypted vault by the
-git profile backup step in `mm backup` (also called by `mm maintain`) and
-restored by `mm restore`.
-
-The managed `pre-commit` and `pre-push` hooks reject a per-repository identity
-override, an unknown remote, and outgoing commits with the wrong author. Full
-policy, recovery procedure and threat model: `~/Repositories/GIT.md`.
-
-## Usage
-
-Failed operations return a nonzero exit status; informational warnings such as
-unmanaged apps do not. Update checks report failures separately from “no updates”.
-Automatic cleanup is limited to Homebrew and Mac Manager logs, not app caches.
-Vault eject failures require attention: close open files and eject it manually.
-
-`mm selftest` uses temporary Git configuration and the hooks in this checkout.
-It needs no installed Git profile and does not access the real vault.
-
-**Automatic** — runs every Saturday at 02:00 via launchd.
-
-**Commands:**
-
-```bash
-mm auto      # run automated maintenance now
-mm maintain  # run maintenance now (interactive prompts)
-mm backup    # back up SSH, GPG and git profile (one vault password prompt)
-mm install   # re-run setup
-mm doctor    # check system health
-mm selftest  # verify git hooks plus backup/restore safeguards
-mm triage <file>  # inspect a suspicious file
-mm help      # show available commands
-```
-
-`mm doctor` and `mm selftest` are complements: doctor audits how this machine is
-configured, while selftest uses a throwaway sandbox to assert that the managed
-git hooks reject forbidden identity states and that core backup/restore
-safeguards behave as intended. Doctor alone only ever exercises the happy path.
-
-`mm maintain` reports drift so keeping, uninstalling, or adopting into the `Brewfile` stays a deliberate choice: Homebrew packages installed outside the `Brewfile`, and apps in `/Applications` that did not come in through Homebrew (labelled App Store or manual install). It then asks before taking optional actions: upgrading outdated Homebrew casks, opening macOS Software Update in System Settings, running `mm backup` (SSH, GPG keys/trust and git identity in one vault mount), and clearing QuickTime Player's recent documents history. Authentication for macOS updates is never collected in the terminal: System Settings handles it through its protected UI. The QuickTime cleanup removes QuickTime's app-specific recent-document shared-file-list entries and legacy QuickTime preference keys. It does not delete media files and does not clear system-wide macOS Recent Items.
+The real profile is machine-local because it contains personal data and forge
+URLs. `configs/git-profile.conf.example` documents its format. `mm backup`
+stores it in the encrypted vault; `mm restore` retrieves it. Managed hooks
+reject unknown remotes, repository-level identity overrides and outgoing
+commits with the wrong author. The full local policy lives in
+`~/Repositories/GIT.md`.
 
 ## File triage
-
-File triage is a deliberate part of this workstation setup, not an add-on: the machine should be able to handle quick, self-contained file research on its own, without reaching for a separate analysis environment first.
-
-Use `mm triage` for a quick first look at a suspicious file:
 
 ```bash
 mm triage ~/Downloads/example.exe
 ```
 
-The command:
-- identifies the file type using `file`
-- calculates the SHA256 hash
-- looks up the hash in VirusTotal when the `vt` CLI is available
-- shows a short hex preview
-- checks magic bytes against common file types
-- flags mismatches between file extension and detected content
-- extracts quick indicators such as URLs, IPs, shell commands and suspicious strings
-- prints a simple triage score
-- opens extracted strings in `less` for manual review
+The command reports file type and SHA-256, checks VirusTotal when `vt` is
+configured, compares extension and magic bytes, and extracts a small set of
+useful indicators. It never replaces a full malware-analysis environment.
 
-The installer installs `virustotal-cli`. The triage script uses the CLI command `vt` for lookups, so configure the `vt` CLI with your VirusTotal API key first. The string view opens in `less`; press `q` to exit it.
+## Secrets and backups
 
-## Secrets & SSH keys
-
-Avoid storing API keys and tokens as plain text in dotfiles. On macOS, Keychain or Apple Passwords is a better place for them.
-
-For one-off Keychain use, source the helper file first:
+Keep API keys out of dotfiles. The shared helper can store and retrieve a value
+through macOS Keychain:
 
 ```bash
 source ~/Repositories/dev/mac-workstation/scripts/mm_common.sh
-keychain_set "ANTHROPIC_API_KEY"   # store once; prompts for the secret
-keychain_get "ANTHROPIC_API_KEY"   # retrieve
+keychain_set "ANTHROPIC_API_KEY"
+keychain_get "ANTHROPIC_API_KEY"
 ```
 
-In `~/.zshrc`, load the key directly from Keychain instead of hardcoding it:
+Recovery material lives in one encrypted sparsebundle:
 
-```bash
-export ANTHROPIC_API_KEY="$(security find-generic-password -a "$USER" -s ANTHROPIC_API_KEY -w 2>/dev/null)"
-```
-
-`mm doctor` scans shell dotfiles for likely plain-text secrets and masks their values in the output. It also shows an inventory of SSH private keys in `~/.ssh` — name, type, bits, fingerprint, and modification date — and warns on loose directory/file permissions, DSA keys, and short RSA keys (< 3072b). Only group or other access triggers a warning; common safe modes are `600` and `400`. For SSH trust awareness, it also summarizes `known_hosts` with visible and hashed host patterns, modification date, and a small visible sample when available.
-
-Use passphrases for SSH private keys. macOS can remember those passphrases in Keychain.
-
-### Encrypted secrets vault
-
-For secrets that should be recoverable on a new Mac but should not live as plain files in iCloud Drive, this setup uses one encrypted sparsebundle:
-
-```bash
+```text
 ~/Library/Mobile Documents/com~apple~CloudDocs/Secure Vault/Secrets.sparsebundle
 ```
 
-macOS asks for the vault password each time it needs to be mounted. On the first run it also asks you to choose that password — store it in your password manager. The script never stores or logs the vault password.
+`mm backup` mounts it once and writes:
 
-Inside the mounted vault, SSH, GPG and PEM material have different lifecycles:
+- `ssh-backup/`: a mirror of `~/.ssh`
+- `gpg-backup/`: portable exports, a full `~/.gnupg` copy and archives
+- `git-profile/`: the machine-local Git identity
+- `pem-archive/`: manual storage; created if absent, never synced or restored
 
-```text
-ssh-backup/
-gpg-backup/
-pem-archive/
-```
+Every backup is verified after writing. Files are compared by checksum and
+relative path; missing, changed or unexpected payload files fail the run.
+Directory metadata and Finder's `.DS_Store` are ignored. GPG verification
+covers the source snapshot, `latest` and the extracted archive.
 
-`ssh-backup/` is managed by `mm backup` (and its prompt in `mm maintain`). It mirrors `~/.ssh` into the encrypted vault and may overwrite that backup on future runs.
+The vault password is handled by macOS and is never read or logged by the
+scripts. After a successful backup, let iCloud Drive finish syncing before
+shutting down or editing the vault elsewhere.
 
-`gpg-backup/` is managed by `mm backup` (and its prompt in `mm maintain`). It stores `latest/portable/` exports (`public-keys.asc`, `secret-keys.asc`, `ownertrust.txt`, and `secret-keys-list.txt`), `latest/full-gnupg/.gnupg/`, and timestamped archives under `archives/`.
-
-Each backup is checksum-verified after it is written. SSH and GPG directories
-are compared file by file, including missing or unexpected files; the Git
-profile is compared with SHA-256. A mismatch makes the backup fail instead of
-reporting success. Directory timestamps, permissions and Finder's `.DS_Store`
-metadata are not backup payload and are ignored by the comparison.
-
-Both backups are restored with `mm restore`; see [Restore on a new Mac](#restore-on-a-new-mac). The equivalent manual GPG import, if you prefer to do it by hand:
+Use section flags when needed:
 
 ```bash
-cd "/Volumes/Secrets/gpg-backup/latest/portable"
-gpg --import public-keys.asc
-gpg --import secret-keys.asc
-gpg --import-ownertrust ownertrust.txt
+mm backup --ssh
+mm backup --gpg
+mm backup --git-profile
 ```
-
-If you need an exact full restore instead, copy `gpg-backup/latest/full-gnupg/.gnupg/` back to `~/.gnupg` while GPG is not running, then restart GPG/GPG Suite. `mm restore --gpg --full-gnupg --apply` does the same thing and stops the agent first.
-
-`pem-archive/` is manual storage for PEM/private-key files that should live only inside the encrypted vault. The SSH backup command creates the folder but never syncs, cleans, or overwrites it.
-
-Unmount the vault after use and let iCloud Drive finish syncing before shutting down or editing it elsewhere.
-
-### Downloads and iCloud Drive
-
-`~/Downloads` stays a local folder, so AirDrop and browsers keep working without
-iCloud. When iCloud Drive is set up, `mm install` adds `~/Downloads/iCloud
-Downloads` as a shortcut to `iCloud Drive/Downloads`: only what you move in there
-syncs. An existing entry is never replaced. Cleanup tools that follow symlinks
-(`find -L`) cross into iCloud Drive, so do not point them at `~/Downloads`.
 
 ## Restore
 
-For SSH only, clone this repository, let iCloud download the vault, then run:
+`mm restore` is a dry run by default. For a complete recovery procedure, see
+[Restore on a new Mac](docs/restore.md).
 
 ```bash
-bash scripts/mm_restore.sh --ssh
-bash scripts/mm_restore.sh --ssh --apply
+mm restore
+mm restore --apply
 ```
 
-See [the restore guide](docs/restore.md) for full recovery, including GPG and Git identity.
+For an urgent SSH-only restore before installing everything:
 
-## Notes
+```bash
+bash ~/Repositories/dev/mac-workstation/scripts/mm_restore.sh --ssh
+bash ~/Repositories/dev/mac-workstation/scripts/mm_restore.sh --ssh --apply
+```
 
-- Uses a LaunchAgent (user context, no root daemon)
-- Writes logs and last-run status under `~/Library/Logs/mac_manager/`
-- Weekly maintenance removes `auto_*.log` and `maintain_*.log` files older than
-  60 days and truncates Ollama output logs when they exceed 50 MiB
-- Safe to re-run `mm install` at any time, but usually only needed after installer-managed setup changes
-- `mm doctor` can be used to validate the setup and inspect the last recorded run for each script
-- `mm doctor` is read-only: it reports drift (including whether the checkout is behind GitHub) but never changes the system; updating happens via `git pull --ff-only` or the weekly auto run
-- Global Git hygiene is installed by `mm install`: shared excludes and hooks come
-  from this repo and are installed under `~/.config/git`, while the commit
-  identity comes from the machine-local `~/.config/git/git-profile.conf`, which
-  is vault-backed and deliberately not stored here
+## Downloads and iCloud Drive
+
+`~/Downloads` remains local for browsers and AirDrop. When iCloud Drive exists,
+`mm install` creates `~/Downloads/iCloud Downloads` as a symlink to iCloud
+Drive's `Downloads` folder without replacing an existing entry. Cleanup tools
+that follow symlinks, such as `find -L`, can cross into iCloud Drive.
 
 ## License
 
@@ -359,4 +182,7 @@ MIT — Thomas Coppens
 
 ## AI usage
 
-AI was used extensively to design and write the shell scripts, analyze errors, suggest improvements and help structure the documentation. I defined the requirements, reviewed the changes, tested the resulting workflows and remain responsible for the project and its maintenance.
+AI was used extensively to design and write the shell scripts, analyze errors,
+suggest improvements and help structure the documentation. I defined the
+requirements, reviewed the changes, tested the resulting workflows and remain
+responsible for the project and its maintenance.
