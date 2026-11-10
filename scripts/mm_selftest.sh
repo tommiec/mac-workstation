@@ -190,7 +190,13 @@ expect_tree_backup_verification() (
     mkdir -p "$WORK_DIR/checksum-tree/source" "$WORK_DIR/checksum-tree/backup"
     printf 'current\n' > "$WORK_DIR/checksum-tree/source/file"
     rsync -a "$WORK_DIR/checksum-tree/source/" "$WORK_DIR/checksum-tree/backup/"
+    chmod 700 "$WORK_DIR/checksum-tree/backup"
+    touch -t 202001010000 "$WORK_DIR/checksum-tree/backup"
+    printf 'Finder metadata\n' > "$WORK_DIR/checksum-tree/backup/.DS_Store"
     verify_backup "$WORK_DIR/checksum-tree/source" "$WORK_DIR/checksum-tree/backup" \
+        && printf 'changed\n' > "$WORK_DIR/checksum-tree/backup/file" \
+        && ! verify_backup "$WORK_DIR/checksum-tree/source" "$WORK_DIR/checksum-tree/backup" >/dev/null 2>&1 \
+        && cp "$WORK_DIR/checksum-tree/source/file" "$WORK_DIR/checksum-tree/backup/file" \
         && printf 'unexpected\n' > "$WORK_DIR/checksum-tree/backup/extra" \
         && ! verify_backup "$WORK_DIR/checksum-tree/source" "$WORK_DIR/checksum-tree/backup" >/dev/null 2>&1
 )
@@ -212,7 +218,7 @@ expect_logic 0 "failed step marks run failed" expect_failed_step
 expect_logic 0 "failed eject is propagated" expect_failed_eject
 expect_logic 0 "successful eject releases ownership" expect_successful_eject
 expect_logic 0 "backup: file checksum detects drift" expect_file_backup_verification
-expect_logic 0 "backup: tree checksums detect extras" expect_tree_backup_verification
+expect_logic 0 "backup: tree checksums detect drift" expect_tree_backup_verification
 echo
 
 # Creates a repo with the given remote and one commit. Hooks are skipped and the

@@ -302,7 +302,8 @@ pem-archive/
 Each backup is checksum-verified after it is written. SSH and GPG directories
 are compared file by file, including missing or unexpected files; the Git
 profile is compared with SHA-256. A mismatch makes the backup fail instead of
-reporting success.
+reporting success. Directory timestamps, permissions and Finder's `.DS_Store`
+metadata are not backup payload and are ignored by the comparison.
 
 Both backups are restored with `mm restore`; see [Restore on a new Mac](#restore-on-a-new-mac). The equivalent manual GPG import, if you prefer to do it by hand:
 

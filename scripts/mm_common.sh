@@ -328,8 +328,9 @@ backup_git_profile() {
 }
 
 # Verifies that a written backup still matches its source. Files use SHA-256;
-# directories use rsync's per-file checksums and also detect missing or extra
-# entries. Extra arguments are rsync filters shared with the copy step.
+# directories compare paths, symlinks and per-file checksums while ignoring
+# directory metadata and Finder's .DS_Store noise. Extra arguments are rsync
+# filters shared with the copy step.
 verify_backup() {
     local source="$1" backup="$2" differences source_hash backup_hash
     shift 2
@@ -342,7 +343,7 @@ verify_backup() {
     fi
 
     [[ -d "$source" && -d "$backup" ]] || return 1
-    if ! differences="$(rsync -a --checksum --delete --dry-run --itemize-changes \
+    if ! differences="$(rsync -rcln --delete --itemize-changes --exclude '.DS_Store' \
         "$@" "$source/" "$backup/" 2>&1)"; then
         printf '%s\n' "$differences" >&2
         return 1
