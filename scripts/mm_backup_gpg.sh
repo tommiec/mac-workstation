@@ -12,6 +12,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/mm_common.sh"
 
 GPG_SOURCE="${GNUPGHOME:-$HOME/.gnupg}"
+GPG_RSYNC_FILTERS=(--exclude 'S.*' --exclude '*.lock')
 STAMP="$(date '+%Y-%m-%d_%H-%M-%S')"
 TMP_BACKUP=""
 
@@ -102,10 +103,15 @@ fi
 echo "Copying ~/.gnupg..."
 mkdir -p "$FULL_DIR/.gnupg"
 if ! rsync -rltpgo --delete \
-    --exclude 'S.*' \
-    --exclude '*.lock' \
+    "${GPG_RSYNC_FILTERS[@]}" \
     "$GPG_SOURCE/" "$FULL_DIR/.gnupg/"; then
     echo "❌ Could not copy GPG home folder"
+    exit 1
+fi
+
+echo "Verifying GPG source snapshot checksums..."
+if ! verify_backup "$GPG_SOURCE" "$FULL_DIR/.gnupg" "${GPG_RSYNC_FILTERS[@]}"; then
+    echo "❌ GPG source snapshot verification failed"
     exit 1
 fi
 
@@ -142,10 +148,25 @@ cp "$TMP_BACKUP/manifest.txt" "$LATEST_DIR/manifest.txt" || {
     exit 1
 }
 
+echo "Verifying latest GPG backup checksums..."
+if ! verify_backup "$TMP_BACKUP" "$LATEST_DIR"; then
+    echo "❌ Latest GPG backup verification failed"
+    exit 1
+fi
+
 if ! tar -czf "$ARCHIVE_PATH" -C "$TMP_BACKUP" portable full-gnupg manifest.txt; then
     echo "❌ Could not create GPG backup archive"
     exit 1
 fi
+
+ARCHIVE_VERIFY_DIR="$TMP_BACKUP/.archive-verify"
+mkdir "$ARCHIVE_VERIFY_DIR" || exit 1
+if ! tar -xzf "$ARCHIVE_PATH" -C "$ARCHIVE_VERIFY_DIR" \
+    || ! verify_backup "$TMP_BACKUP" "$ARCHIVE_VERIFY_DIR" --exclude '.archive-verify/'; then
+    echo "❌ GPG archive verification failed"
+    exit 1
+fi
+rm -rf "$ARCHIVE_VERIFY_DIR"
 
 PORTABLE_FILE_COUNT="$(find "$LATEST_DIR/portable" -type f 2>/dev/null | wc -l | tr -d ' ')"
 FULL_FILE_COUNT="$(find "$LATEST_DIR/full-gnupg/.gnupg" -type f 2>/dev/null | wc -l | tr -d ' ')"
@@ -160,6 +181,7 @@ fi
 
 echo
 echo "✅ GPG backup complete"
+echo "   Checksums: source, latest and archive verified"
 echo "   Secret keys: $SECRET_KEY_COUNT"
 echo "   Portable files: $PORTABLE_FILE_COUNT"
 echo "   Full .gnupg files: $FULL_FILE_COUNT"

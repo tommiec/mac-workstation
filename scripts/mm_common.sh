@@ -327,6 +327,32 @@ backup_git_profile() {
     chmod 600 "$dst/git-profile.conf" 2>/dev/null || true
 }
 
+# Verifies that a written backup still matches its source. Files use SHA-256;
+# directories use rsync's per-file checksums and also detect missing or extra
+# entries. Extra arguments are rsync filters shared with the copy step.
+verify_backup() {
+    local source="$1" backup="$2" differences source_hash backup_hash
+    shift 2
+
+    if [[ -f "$source" && -f "$backup" ]]; then
+        source_hash="$(shasum -a 256 "$source" | awk '{print $1}')" || return 1
+        backup_hash="$(shasum -a 256 "$backup" | awk '{print $1}')" || return 1
+        [[ "$source_hash" == "$backup_hash" ]]
+        return
+    fi
+
+    [[ -d "$source" && -d "$backup" ]] || return 1
+    if ! differences="$(rsync -a --checksum --delete --dry-run --itemize-changes \
+        "$@" "$source/" "$backup/" 2>&1)"; then
+        printf '%s\n' "$differences" >&2
+        return 1
+    fi
+    if [[ -n "$differences" ]]; then
+        printf '%s\n' "$differences" >&2
+        return 1
+    fi
+}
+
 # Prints one tab-separated "<repo-path> <identity-or-error> <config-origin>"
 # line per repository under the managed workspace scopes. The origin is included
 # so a caller can tell a compliant identity from one that merely resolves: a

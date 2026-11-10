@@ -12,6 +12,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/mm_common.sh"
 
 SSH_SOURCE="$HOME/.ssh"
+SSH_RSYNC_FILTERS=(--exclude 'agent/' --exclude '*.sock' --exclude 'control-*' --exclude '.DS_Store')
 
 echo "── 🔐 SSH backup ──"
 echo
@@ -47,14 +48,17 @@ mkdir -p "$BACKUP_ROOT" "$PEM_ARCHIVE"
 
 echo "Syncing ~/.ssh..."
 if rsync -a --delete \
-    --exclude 'agent/' \
-    --exclude '*.sock' \
-    --exclude 'control-*' \
-    --exclude '.DS_Store' \
+    "${SSH_RSYNC_FILTERS[@]}" \
     "$SSH_SOURCE/" "$BACKUP_ROOT/.ssh/"; then
     chmod 700 "$BACKUP_ROOT/.ssh" 2>/dev/null || true
 else
     echo "❌ SSH backup failed"
+    exit 1
+fi
+
+echo "Verifying SSH backup checksums..."
+if ! verify_backup "$SSH_SOURCE" "$BACKUP_ROOT/.ssh" "${SSH_RSYNC_FILTERS[@]}"; then
+    echo "❌ SSH backup verification failed"
     exit 1
 fi
 
@@ -69,6 +73,7 @@ SSH_FILE_COUNT="$(find "$BACKUP_ROOT/.ssh" -type f 2>/dev/null | wc -l | tr -d '
 
 echo
 echo "✅ SSH backup complete"
+echo "   Checksums: verified"
 echo "   Files: $SSH_FILE_COUNT"
 echo "   Backup: $BACKUP_ROOT/.ssh"
 echo "   PEM archive folder kept separate: $PEM_ARCHIVE"

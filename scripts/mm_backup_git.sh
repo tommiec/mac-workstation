@@ -34,10 +34,12 @@ if [[ ! -f "$GIT_PROFILE_CONF" ]]; then
     exit 1
 fi
 
-if ! command -v diskutil >/dev/null 2>&1; then
-    echo "❌ Required macOS tool not found: diskutil"
-    exit 1
-fi
+for tool in diskutil shasum; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        echo "❌ Required tool not found: $tool"
+        exit 1
+    fi
+done
 
 if ! ensure_vault; then
     echo "❌ Could not create encrypted sparsebundle"
@@ -58,6 +60,12 @@ fi
 
 BACKUP_FILE="$VAULT_MOUNT_POINT/git-profile/git-profile.conf"
 
+echo "Verifying Git profile backup checksum..."
+if ! verify_backup "$GIT_PROFILE_CONF" "$BACKUP_FILE"; then
+    echo "❌ Git profile backup verification failed"
+    exit 1
+fi
+
 cat > "$VAULT_MOUNT_POINT/git-profile/manifest.txt" <<EOF
 source=$GIT_PROFILE_CONF
 created_at=$(date '+%Y-%m-%d %H:%M:%S %z')
@@ -67,6 +75,7 @@ note=forge credentials live in the Keychain and are deliberately not backed up
 EOF
 
 echo "✅ Git profile backup complete"
+echo "   Checksum: verified"
 echo "   Backup: $BACKUP_FILE"
 echo "   Forges: $(git_profile_forges | tr '\n' ' ')"
 echo

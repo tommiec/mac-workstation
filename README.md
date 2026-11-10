@@ -299,6 +299,11 @@ pem-archive/
 
 `gpg-backup/` is managed by `mm backup` (and its prompt in `mm maintain`). It stores `latest/portable/` exports (`public-keys.asc`, `secret-keys.asc`, `ownertrust.txt`, and `secret-keys-list.txt`), `latest/full-gnupg/.gnupg/`, and timestamped archives under `archives/`.
 
+Each backup is checksum-verified after it is written. SSH and GPG directories
+are compared file by file, including missing or unexpected files; the Git
+profile is compared with SHA-256. A mismatch makes the backup fail instead of
+reporting success.
+
 Both backups are restored with `mm restore`; see [Restore on a new Mac](#restore-on-a-new-mac). The equivalent manual GPG import, if you prefer to do it by hand:
 
 ```bash

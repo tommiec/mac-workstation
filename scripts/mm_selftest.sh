@@ -177,6 +177,24 @@ expect_successful_eject() (
     vault_eject >/dev/null && [[ "$VAULT_MOUNTED_BY_SCRIPT" -eq 0 ]]
 )
 
+expect_file_backup_verification() (
+    mkdir -p "$WORK_DIR/checksum-file"
+    printf 'current\n' > "$WORK_DIR/checksum-file/source"
+    cp "$WORK_DIR/checksum-file/source" "$WORK_DIR/checksum-file/backup"
+    verify_backup "$WORK_DIR/checksum-file/source" "$WORK_DIR/checksum-file/backup" \
+        && printf 'stale\n' > "$WORK_DIR/checksum-file/backup" \
+        && ! verify_backup "$WORK_DIR/checksum-file/source" "$WORK_DIR/checksum-file/backup" >/dev/null 2>&1
+)
+
+expect_tree_backup_verification() (
+    mkdir -p "$WORK_DIR/checksum-tree/source" "$WORK_DIR/checksum-tree/backup"
+    printf 'current\n' > "$WORK_DIR/checksum-tree/source/file"
+    rsync -a "$WORK_DIR/checksum-tree/source/" "$WORK_DIR/checksum-tree/backup/"
+    verify_backup "$WORK_DIR/checksum-tree/source" "$WORK_DIR/checksum-tree/backup" \
+        && printf 'unexpected\n' > "$WORK_DIR/checksum-tree/backup/extra" \
+        && ! verify_backup "$WORK_DIR/checksum-tree/source" "$WORK_DIR/checksum-tree/backup" >/dev/null 2>&1
+)
+
 # ── Core backup/restore safeguards ──────────────────────
 
 echo "── core backup/restore safeguards ──"
@@ -193,6 +211,8 @@ expect_logic 0 "icloud: creates Downloads shortcut" expect_icloud_downloads_link
 expect_logic 0 "failed step marks run failed" expect_failed_step
 expect_logic 0 "failed eject is propagated" expect_failed_eject
 expect_logic 0 "successful eject releases ownership" expect_successful_eject
+expect_logic 0 "backup: file checksum detects drift" expect_file_backup_verification
+expect_logic 0 "backup: tree checksums detect extras" expect_tree_backup_verification
 echo
 
 # Creates a repo with the given remote and one commit. Hooks are skipped and the
